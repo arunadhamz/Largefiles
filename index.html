@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRS/SDD Generator v2</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap');
+  :root {
+    --bg:#0c0e14; --s1:#13161f; --s2:#1b1f2b; --s3:#242938;
+    --bdr:#2a3044; --txt:#d8dce8; --dim:#6b7394; --acc:#5b8def;
+    --acc2:#4a7ae0; --accg:rgba(91,141,239,.12); --grn:#34d399;
+    --org:#f59e0b; --red:#ef4444; --pur:#a78bfa; --r:8px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:14px}
+
+  /* HEADER */
+  .hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:var(--s1);border-bottom:1px solid var(--bdr)}
+  .hdr h1{font-size:16px;font-weight:700;letter-spacing:-.3px}
+  .hdr h1 b{color:var(--acc)}
+  .hdr-right{display:flex;gap:16px;align-items:center;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--dim)}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px}
+  .dot-g{background:var(--grn);box-shadow:0 0 6px var(--grn)} .dot-r{background:var(--red)}
+
+  /* LAYOUT */
+  .layout{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 49px)}
+  .side{background:var(--s1);border-right:1px solid var(--bdr);padding:16px;overflow-y:auto}
+  .main{padding:24px 32px;overflow-y:auto}
+
+  /* SIDEBAR */
+  .sh{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin:16px 0 8px}
+  .sh:first-child{margin-top:0}
+
+  .ccard{background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px;margin-bottom:8px;cursor:pointer;transition:.2s}
+  .ccard:hover{border-color:var(--acc)} .ccard.active{border-color:var(--acc);background:var(--accg)}
+  .ccard .cn{font-size:12px;font-weight:600} .ccard .cd{font-size:10px;color:var(--dim);margin-top:2px}
+  .ccard .cc{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--acc);margin-top:4px}
+
+  select,input[type=text],textarea{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);padding:9px 12px;color:var(--txt);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:.2s}
+  select:focus,input:focus,textarea:focus{border-color:var(--acc)}
+  textarea{font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;min-height:140px;resize:vertical}
+  label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin:14px 0 5px}
+
+  /* UPLOAD */
+  .uzone{border:2px dashed var(--bdr);border-radius:var(--r);padding:18px;text-align:center;cursor:pointer;transition:.2s;margin:10px 0}
+  .uzone:hover,.uzone.dg{border-color:var(--acc);background:var(--accg)}
+  .uzone .ic{font-size:24px} .uzone p{font-size:11px;color:var(--dim);margin-top:4px}
+  #file-input{display:none}
+  .ulog{max-height:150px;overflow-y:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim)}
+  .ulog .e{padding:3px 0;border-bottom:1px solid var(--bdr)} .ulog .ok{color:var(--grn)} .ulog .er{color:var(--red)}
+
+  /* TABS */
+  .tabs{display:flex;border-bottom:1px solid var(--bdr);margin-bottom:20px}
+  .tab{padding:9px 20px;font-size:12px;font-weight:600;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
+  .tab:hover{color:var(--txt)} .tab.on{color:var(--acc);border-bottom-color:var(--acc)}
+  .tc{display:none} .tc.on{display:block}
+
+  /* BUTTONS */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 22px;border:none;border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+  .bp{background:var(--acc);color:#fff} .bp:hover{background:var(--acc2)} .bp:disabled{opacity:.4;cursor:not-allowed}
+  .bs{background:var(--s2);color:var(--txt);border:1px solid var(--bdr)} .bs:hover{border-color:var(--acc)}
+  .bg{background:#059669;color:#fff} .bg:hover{background:#047857}
+  .bpur{background:#7c3aed;color:#fff} .bpur:hover{background:#6d28d9}
+  .actions{margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+  /* SPINNER */
+  .spin{display:none;width:16px;height:16px;border:2px solid var(--bdr);border-top-color:var(--acc);border-radius:50%;animation:sp .7s linear infinite}
+  .spin.on{display:inline-block} @keyframes sp{to{transform:rotate(360deg)}}
+  .sts{font-size:11px;color:var(--dim);margin-left:6px}
+
+  /* OUTPUT */
+  .obox{margin-top:20px;background:var(--s1);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden}
+  .ohdr{padding:10px 14px;background:var(--s2);border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600}
+  .obody{padding:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;max-height:500px;overflow-y:auto;white-space:pre-wrap;color:var(--dim)}
+
+  /* PIPELINE STEPPER */
+  .stepper{display:flex;gap:0;margin-bottom:24px}
+  .step{flex:1;padding:12px 16px;background:var(--s2);border:1px solid var(--bdr);font-size:12px;font-weight:600;color:var(--dim);text-align:center;cursor:pointer;transition:.2s;position:relative}
+  .step:first-child{border-radius:var(--r) 0 0 var(--r)} .step:last-child{border-radius:0 var(--r) var(--r) 0}
+  .step.active{background:var(--accg);color:var(--acc);border-color:var(--acc)}
+  .step.done{background:rgba(52,211,153,.08);color:var(--grn);border-color:var(--grn)}
+  .step .snum{display:block;font-size:18px;font-weight:700;margin-bottom:2px}
+  .step .slbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+
+  /* REQUIREMENTS TABLE */
+  .rtable{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+  .rtable th{background:var(--s2);padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);border-bottom:1px solid var(--bdr)}
+  .rtable td{padding:7px 10px;border-bottom:1px solid var(--bdr)}
+  .rtable tr:hover{background:var(--s2)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase}
+  .badge-func{background:rgba(91,141,239,.15);color:var(--acc)}
+  .badge-perf{background:rgba(245,158,11,.15);color:var(--org)}
+  .badge-if{background:rgba(167,139,250,.15);color:var(--pur)}
+  .badge-safe{background:rgba(239,68,68,.15);color:var(--red)}
+  .badge-con{background:rgba(107,115,148,.2);color:var(--dim)}
+
+  /* SECTION CARDS */
+  .sec-card{background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+  .sec-card .si{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--acc);margin-right:8px}
+  .sec-card .st{font-size:13px;font-weight:500}
+  .sec-card button{font-size:11px}
+
+  /* PROJECTS LIST */
+  .pcard{background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);padding:14px;margin-bottom:8px;cursor:pointer;transition:.2s}
+  .pcard:hover{border-color:var(--acc)}
+  .pcard .pn{font-weight:600;font-size:13px} .pcard .pd{font-size:11px;color:var(--dim);margin-top:2px}
+  .pcard .pills{display:flex;gap:6px;margin-top:6px}
+  .pill{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+  .pill-srs{background:rgba(91,141,239,.15);color:var(--acc)}
+  .pill-sdd{background:rgba(52,211,153,.15);color:var(--grn)}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <h1>◆ SRS/SDD <b>RAG</b> Generator <span style="font-size:11px;color:var(--dim);font-weight:400">v2</span></h1>
+  <div class="hdr-right">
+    <span><span class="dot dot-g" id="ollama-dot"></span>Ollama</span>
+    <span><span class="dot dot-g"></span>ChromaDB</span>
+    <span id="hdr-chunks">0 chunks</span>
+  </div>
+</header>
+
+<div class="layout">
+<!-- ==================== SIDEBAR ==================== -->
+<aside class="side">
+  <div class="sh">Knowledge Base</div>
+  <div id="coll-list"></div>
+
+  <div class="sh">Ingest Documents</div>
+  <select id="up-coll" style="font-size:11px">
+    <option value="srs_templates">SRS Templates</option>
+    <option value="sdd_templates">SDD Templates</option>
+    <option value="requirements">Requirements / HRS</option>
+    <option value="reference_docs">Reference SRS/SDD</option>
+  </select>
+  <div class="uzone" id="uzone"><div class="ic">📄</div><strong>Drop files</strong><p>.docx .pdf .txt .md</p></div>
+  <input type="file" id="file-input" multiple accept=".docx,.pdf,.txt,.md">
+  <div class="ulog" id="ulog"></div>
+
+  <div class="sh">Past Projects</div>
+  <div id="proj-list"><span style="font-size:11px;color:var(--dim)">No projects yet</span></div>
+</aside>
+
+<!-- ==================== MAIN ==================== -->
+<main class="main">
+  <div class="tabs">
+    <div class="tab on" data-t="pipeline">Pipeline</div>
+    <div class="tab" data-t="search">Search KB</div>
+  </div>
+
+  <!-- ======= PIPELINE TAB ======= -->
+  <div class="tc on" id="t-pipeline">
+
+    <!-- STEPPER -->
+    <div class="stepper">
+      <div class="step active" data-s="1" onclick="goStep(1)"><span class="snum">1</span><span class="slbl">Upload HRS</span></div>
+      <div class="step" data-s="2" onclick="goStep(2)"><span class="snum">2</span><span class="slbl">Review Requirements</span></div>
+      <div class="step" data-s="3" onclick="goStep(3)"><span class="snum">3</span><span class="slbl">Generate SRS</span></div>
+      <div class="step" data-s="4" onclick="goStep(4)"><span class="snum">4</span><span class="slbl">Generate SDD</span></div>
+      <div class="step" data-s="5" onclick="goStep(5)"><span class="snum">5</span><span class="slbl">Traceability</span></div>
+    </div>
+
+    <!-- STEP 1: UPLOAD HRS -->
+    <div class="step-content" id="sc-1">
+      <h3 style="margin-bottom:12px">Step 1 — Upload HRS or Paste Requirements</h3>
+      <label>Project Name</label>
+      <input type="text" id="proj-name" placeholder="e.g., Radar Signal Processing Unit v2.0">
+
+      <label>Upload HRS Document (auto-extracts requirements)</label>
+      <div class="uzone" id="hrs-zone"><div class="ic">📋</div><strong>Drop HRS file here</strong><p>.docx .pdf .txt .md — requirements will be auto-extracted</p></div>
+      <input type="file" id="hrs-input" accept=".docx,.pdf,.txt,.md">
+
+      <label>Or Paste Requirements Directly</label>
+      <textarea id="raw-reqs" placeholder="Paste requirements in any format:
+
+REQ-001: The system shall process radar signals at 100MHz
+The software must interface with FPGA via PCIe Gen3
+1. Support MIL-STD-1553B communication
+- Handle real-time target tracking at 60fps
+SAF-003: Emergency shutdown within 100ms"></textarea>
+
+      <div class="actions">
+        <button class="btn bp" onclick="extractRequirements()">Extract & Classify Requirements →</button>
+        <div class="spin" id="spin-extract"></div>
+        <span class="sts" id="sts-extract"></span>
+      </div>
+    </div>
+
+    <!-- STEP 2: REVIEW REQUIREMENTS -->
+    <div class="step-content" id="sc-2" style="display:none">
+      <h3>Step 2 — Review Extracted Requirements</h3>
+      <p style="font-size:12px;color:var(--dim);margin:8px 0">Auto-classified from your HRS. Edit types or remove incorrect entries before generating.</p>
+
+      <div id="req-summary" style="display:flex;gap:12px;margin:12px 0;flex-wrap:wrap"></div>
+
+      <table class="rtable">
+        <thead><tr><th>ID</th><th>Requirement</th><th>Type</th><th>Source</th></tr></thead>
+        <tbody id="req-tbody"></tbody>
+      </table>
+
+      <div class="actions">
+        <button class="btn bs" onclick="goStep(1)">← Back</button>
+        <button class="btn bp" onclick="goStep(3)">Proceed to SRS Generation →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: GENERATE SRS -->
+    <div class="step-content" id="sc-3" style="display:none">
+      <h3>Step 3 — Generate SRS</h3>
+      <label>Additional Instructions (optional)</label>
+      <textarea id="srs-instr" style="min-height:80px" placeholder="e.g., Follow DO-178C, focus on safety-critical reqs, use our DAL-A template format..."></textarea>
+
+      <div class="actions">
+        <button class="btn bs" onclick="goStep(2)">← Back</button>
+        <button class="btn bp" id="btn-gen-srs" onclick="generateSRS()">Generate SRS</button>
+        <div class="spin" id="spin-srs"></div>
+        <span class="sts" id="sts-srs"></span>
+      </div>
+
+      <div class="obox" id="srs-output" style="display:none">
+        <div class="ohdr">
+          <span>Generated SRS</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn bs" onclick="downloadDoc('srs')">Download .docx</button>
+            <button class="btn bg" onclick="goStep(4)">Generate SDD →</button>
+          </div>
+        </div>
+        <div class="obody" id="srs-body"></div>
+      </div>
+
+      <!-- SECTION REGENERATION -->
+      <div id="srs-sections" style="margin-top:20px;display:none">
+        <h4 style="margin-bottom:10px">Regenerate Sections</h4>
+        <div id="srs-sec-list"></div>
+        <label>Feedback for selected section</label>
+        <textarea id="sec-feedback" style="min-height:60px" placeholder="e.g., Expand the interface requirements, add MIL-STD-1553B details..."></textarea>
+        <div class="actions">
+          <button class="btn bpur" onclick="regenerateSection('srs')">Regenerate Selected Section</button>
+          <div class="spin" id="spin-regen"></div>
+        </div>
+        <div class="obox" id="regen-output" style="display:none">
+          <div class="ohdr"><span>Regenerated Section</span></div>
+          <div class="obody" id="regen-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4: GENERATE SDD -->
+    <div class="step-content" id="sc-4" style="display:none">
+      <h3>Step 4 — Generate SDD from SRS</h3>
+      <p style="font-size:12px;color:var(--dim);margin:8px 0">SDD will be derived from the generated SRS, ensuring full traceability.</p>
+
+      <label>Additional SDD Instructions (optional)</label>
+      <textarea id="sdd-instr" style="min-height:80px" placeholder="e.g., Use layered architecture, describe FPGA-CPU interface in detail..."></textarea>
+
+      <div class="actions">
+        <button class="btn bs" onclick="goStep(3)">← Back</button>
+        <button class="btn bg" id="btn-gen-sdd" onclick="generateSDD()">Generate SDD from SRS</button>
+        <div class="spin" id="spin-sdd"></div>
+        <span class="sts" id="sts-sdd"></span>
+      </div>
+
+      <div class="obox" id="sdd-output" style="display:none">
+        <div class="ohdr">
+          <span>Generated SDD</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn bs" onclick="downloadDoc('sdd')">Download .docx</button>
+            <button class="btn bpur" onclick="goStep(5)">Traceability Matrix →</button>
+          </div>
+        </div>
+        <div class="obody" id="sdd-body"></div>
+      </div>
+    </div>
+
+    <!-- STEP 5: TRACEABILITY -->
+    <div class="step-content" id="sc-5" style="display:none">
+      <h3>Step 5 — Traceability Matrix</h3>
+      <p style="font-size:12px;color:var(--dim);margin:8px 0">HRS → SRS → SDD requirement traceability with verification methods.</p>
+
+      <div class="actions">
+        <button class="btn bs" onclick="goStep(4)">← Back</button>
+        <button class="btn bpur" onclick="generateTraceability()">Generate Traceability Matrix</button>
+        <div class="spin" id="spin-trace"></div>
+        <span class="sts" id="sts-trace"></span>
+      </div>
+
+      <div class="obox" id="trace-output" style="display:none">
+        <div class="ohdr"><span>Traceability Matrix (HRS → SRS → SDD)</span></div>
+        <div class="obody" id="trace-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= SEARCH TAB ======= -->
+  <div class="tc" id="t-search">
+    <label>Search Knowledge Base</label>
+    <input type="text" id="sq" placeholder="e.g., functional requirements for communication module">
+    <div class="actions">
+      <button class="btn bp" onclick="searchKB()">Search</button>
+      <div class="spin" id="spin-search"></div>
+    </div>
+    <div id="search-res" style="margin-top:16px"></div>
+  </div>
+</main>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let STATE = {
+  projectId: null,
+  projectName: "",
+  requirements: [],
+  rawText: "",
+  srsContent: "",
+  sddContent: "",
+  srsDocx: "",
+  sddDocx: "",
+  selectedSection: null,
+};
+
+// ============================================================
+// TABS
+// ============================================================
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.tc').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+    document.getElementById('t-' + t.dataset.t).classList.add('on');
+  };
+});
+
+// ============================================================
+// STEPPER
+// ============================================================
+function goStep(n) {
+  document.querySelectorAll('.step-content').forEach(x => x.style.display = 'none');
+  document.getElementById('sc-' + n).style.display = 'block';
+  document.querySelectorAll('.step').forEach(s => {
+    const sn = parseInt(s.dataset.s);
+    s.classList.remove('active', 'done');
+    if (sn < n) s.classList.add('done');
+    else if (sn === n) s.classList.add('active');
+  });
+}
+
+// ============================================================
+// SIDEBAR: COLLECTIONS
+// ============================================================
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    document.getElementById('ollama-dot').className = d.ollama ? 'dot dot-g' : 'dot dot-r';
+    const list = document.getElementById('coll-list');
+    let total = 0;
+    list.innerHTML = '';
+    for (const [name, info] of Object.entries(d.collections)) {
+      total += info.count;
+      list.innerHTML += `<div class="ccard"><div class="cn">${name.replace(/_/g,' ')}</div><div class="cd">${info.description}</div><div class="cc">${info.count} chunks</div></div>`;
+    }
+    document.getElementById('hdr-chunks').textContent = total + ' chunks';
+  } catch(e) { console.error(e); }
+}
+
+// ============================================================
+// SIDEBAR: UPLOAD TO KB
+// ============================================================
+const uz = document.getElementById('uzone'), fi = document.getElementById('file-input');
+uz.onclick = () => fi.click();
+uz.ondragover = e => { e.preventDefault(); uz.classList.add('dg'); };
+uz.ondragleave = () => uz.classList.remove('dg');
+uz.ondrop = e => { e.preventDefault(); uz.classList.remove('dg'); uploadFiles(e.dataTransfer.files); };
+fi.onchange = () => uploadFiles(fi.files);
+
+async function uploadFiles(files) {
+  const coll = document.getElementById('up-coll').value;
+  const log = document.getElementById('ulog');
+  for (const f of files) {
+    const fd = new FormData(); fd.append('file', f); fd.append('collection', coll);
+    const e = document.createElement('div'); e.className = 'e'; e.textContent = '⏳ ' + f.name; log.prepend(e);
+    try {
+      const r = await(await fetch('/api/ingest', {method:'POST', body:fd})).json();
+      if (r.status==='success') { e.className='e ok'; e.textContent='✓ '+f.name+' → '+r.chunks_created+' chunks'; }
+      else { e.className='e er'; e.textContent='✗ '+f.name+': '+r.error; }
+    } catch(err) { e.className='e er'; e.textContent='✗ '+err.message; }
+  }
+  loadStatus();
+}
+
+// ============================================================
+// SIDEBAR: PROJECTS
+// ============================================================
+async function loadProjects() {
+  try {
+    const r = await(await fetch('/api/projects')).json();
+    const el = document.getElementById('proj-list');
+    if (!r.length) { el.innerHTML = '<span style="font-size:11px;color:var(--dim)">No projects yet</span>'; return; }
+    el.innerHTML = r.map(p => `
+      <div class="pcard" onclick="loadProject('${p.id}')">
+        <div class="pn">${p.name}</div>
+        <div class="pd">${p.created?.split('T')[0] || ''}</div>
+        <div class="pills">
+          ${p.has_srs ? '<span class="pill pill-srs">SRS</span>' : ''}
+          ${p.has_sdd ? '<span class="pill pill-sdd">SDD</span>' : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {}
+}
+
+async function loadProject(id) {
+  const d = await(await fetch('/api/project/' + id)).json();
+  STATE.projectId = d.id;
+  STATE.projectName = d.project_name;
+  STATE.requirements = d.requirements || [];
+  STATE.rawText = d.raw_requirements || '';
+  STATE.srsContent = d.srs_content || '';
+  STATE.sddContent = d.sdd_content || '';
+  STATE.srsDocx = d.srs_docx || '';
+  STATE.sddDocx = d.sdd_docx || '';
+
+  document.getElementById('proj-name').value = STATE.projectName;
+  document.getElementById('raw-reqs').value = STATE.rawText;
+
+  if (STATE.requirements.length) { renderRequirements(); goStep(2); }
+  if (STATE.srsContent) {
+    document.getElementById('srs-body').textContent = STATE.srsContent;
+    document.getElementById('srs-output').style.display = 'block';
+    showSRSSections();
+    goStep(3);
+  }
+  if (STATE.sddContent) {
+    document.getElementById('sdd-body').textContent = STATE.sddContent;
+    document.getElementById('sdd-output').style.display = 'block';
+    goStep(4);
+  }
+}
+
+// ============================================================
+// STEP 1 → 2: EXTRACT REQUIREMENTS
+// ============================================================
+const hrsZone = document.getElementById('hrs-zone'), hrsInput = document.getElementById('hrs-input');
+hrsZone.onclick = () => hrsInput.click();
+hrsZone.ondragover = e => { e.preventDefault(); hrsZone.classList.add('dg'); };
+hrsZone.ondragleave = () => hrsZone.classList.remove('dg');
+hrsZone.ondrop = e => { e.preventDefault(); hrsZone.classList.remove('dg'); hrsInput.files = e.dataTransfer.files; extractRequirements(); };
+hrsInput.onchange = () => extractRequirements();
+
+async function extractRequirements() {
+  const sp = document.getElementById('spin-extract');
+  const st = document.getElementById('sts-extract');
+  sp.classList.add('on'); st.textContent = 'Extracting requirements...';
+
+  let res;
+  if (hrsInput.files && hrsInput.files.length) {
+    const fd = new FormData();
+    fd.append('file', hrsInput.files[0]);
+    res = await(await fetch('/api/extract-requirements', {method:'POST', body:fd})).json();
+  } else {
+    const text = document.getElementById('raw-reqs').value;
+    if (!text.trim()) { sp.classList.remove('on'); st.textContent='Enter requirements or upload HRS'; return; }
+    res = await(await fetch('/api/extract-requirements', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text})
+    })).json();
+  }
+
+  sp.classList.remove('on');
+
+  if (res.status === 'success') {
+    STATE.requirements = res.requirements;
+    STATE.rawText = res.raw_text || document.getElementById('raw-reqs').value;
+    STATE.projectName = document.getElementById('proj-name').value || 'Untitled Project';
+    st.textContent = `Found ${res.total} requirements`;
+    renderRequirements();
+    goStep(2);
+  } else {
+    st.textContent = 'Error: ' + res.error;
+  }
+}
+
+function renderRequirements() {
+  const tbody = document.getElementById('req-tbody');
+  const summary = document.getElementById('req-summary');
+
+  // Summary badges
+  const types = {};
+  STATE.requirements.forEach(r => { types[r.type] = (types[r.type]||0) + 1; });
+  summary.innerHTML = Object.entries(types).map(([t,c]) =>
+    `<span class="badge badge-${t==='functional'?'func':t==='performance'?'perf':t==='interface'?'if':t==='safety'?'safe':'con'}">${t}: ${c}</span>`
+  ).join('');
+
+  // Table
+  tbody.innerHTML = STATE.requirements.map((r, i) => `<tr>
+    <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--acc)">${r.id}</td>
+    <td>${r.text.length > 120 ? r.text.substring(0,120)+'...' : r.text}</td>
+    <td>
+      <select style="font-size:11px;padding:4px 6px;width:auto" onchange="STATE.requirements[${i}].type=this.value">
+        <option value="functional" ${r.type==='functional'?'selected':''}>Functional</option>
+        <option value="performance" ${r.type==='performance'?'selected':''}>Performance</option>
+        <option value="interface" ${r.type==='interface'?'selected':''}>Interface</option>
+        <option value="safety" ${r.type==='safety'?'selected':''}>Safety</option>
+        <option value="constraint" ${r.type==='constraint'?'selected':''}>Constraint</option>
+      </select>
+    </td>
+    <td style="font-size:11px;color:var(--dim)">${r.source_section || ''}</td>
+  </tr>`).join('');
+}
+
+// ============================================================
+// STEP 3: GENERATE SRS
+// ============================================================
+async function generateSRS() {
+  const btn = document.getElementById('btn-gen-srs');
+  const sp = document.getElementById('spin-srs');
+  const st = document.getElementById('sts-srs');
+  btn.disabled = true; sp.classList.add('on');
+  st.textContent = 'Retrieving context & generating SRS (2-5 min)...';
+
+  const res = await(await fetch('/api/generate', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      doc_type: 'srs',
+      project_name: STATE.projectName,
+      requirements: STATE.requirements,
+      raw_requirements_text: STATE.rawText,
+      instructions: document.getElementById('srs-instr').value,
+      project_id: STATE.projectId,
+    })
+  })).json();
+
+  sp.classList.remove('on'); btn.disabled = false;
+
+  if (res.status === 'success') {
+    STATE.projectId = res.project_id;
+    STATE.srsContent = res.content;
+    STATE.srsDocx = res.docx_filename;
+    st.textContent = 'SRS generated!';
+    document.getElementById('srs-body').textContent = res.content;
+    document.getElementById('srs-output').style.display = 'block';
+    showSRSSections();
+    loadProjects();
+    // Mark step as done
+    document.querySelector('.step[data-s="3"]').classList.add('done');
+  } else {
+    st.textContent = 'Error: ' + res.error;
+  }
+}
+
+function showSRSSections() {
+  const el = document.getElementById('srs-sections');
+  el.style.display = 'block';
+  const list = document.getElementById('srs-sec-list');
+  // Parse sections from generated content
+  const sections = [];
+  const lines = STATE.srsContent.split('\n');
+  for (const line of lines) {
+    const m = line.match(/^(#{1,4})\s+(\d[\d.]*)\s*(.*)/);
+    if (m) sections.push({ id: m[2], title: m[3], level: m[1].length });
+  }
+  if (!sections.length) {
+    // Fallback: use standard sections
+    list.innerHTML = '<p style="font-size:11px;color:var(--dim)">Could not detect sections. Paste section ID/title in feedback.</p>';
+    return;
+  }
+  list.innerHTML = sections.map(s => `
+    <div class="sec-card" onclick="selectSection('${s.id}','${s.title.replace(/'/g,"\\'")}',this)">
+      <div><span class="si">${s.id}</span><span class="st">${s.title}</span></div>
+    </div>
+  `).join('');
+}
+
+function selectSection(id, title, el) {
+  document.querySelectorAll('.sec-card').forEach(c => c.style.borderColor = 'var(--bdr)');
+  el.style.borderColor = 'var(--acc)';
+  STATE.selectedSection = { id, title };
+}
+
+async function regenerateSection(docType) {
+  if (!STATE.selectedSection) { alert('Select a section first'); return; }
+  const sp = document.getElementById('spin-regen');
+  sp.classList.add('on');
+
+  const res = await(await fetch('/api/regenerate-section', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      project_id: STATE.projectId,
+      doc_type: docType,
+      section_id: STATE.selectedSection.id,
+      section_title: STATE.selectedSection.title,
+      feedback: document.getElementById('sec-feedback').value,
+    })
+  })).json();
+
+  sp.classList.remove('on');
+
+  if (res.status === 'success') {
+    document.getElementById('regen-output').style.display = 'block';
+    document.getElementById('regen-body').textContent = res.content;
+  }
+}
+
+// ============================================================
+// STEP 4: GENERATE SDD (CHAINED)
+// ============================================================
+async function generateSDD() {
+  const btn = document.getElementById('btn-gen-sdd');
+  const sp = document.getElementById('spin-sdd');
+  const st = document.getElementById('sts-sdd');
+  btn.disabled = true; sp.classList.add('on');
+  st.textContent = 'Generating SDD from SRS (2-5 min)...';
+
+  const res = await(await fetch('/api/generate-sdd-from-srs', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      project_id: STATE.projectId,
+      instructions: document.getElementById('sdd-instr').value,
+    })
+  })).json();
+
+  sp.classList.remove('on'); btn.disabled = false;
+
+  if (res.status === 'success') {
+    STATE.sddContent = res.content;
+    STATE.sddDocx = res.docx_filename;
+    st.textContent = 'SDD generated!';
+    document.getElementById('sdd-body').textContent = res.content;
+    document.getElementById('sdd-output').style.display = 'block';
+    document.querySelector('.step[data-s="4"]').classList.add('done');
+    loadProjects();
+  } else {
+    st.textContent = 'Error: ' + res.error;
+  }
+}
+
+// ============================================================
+// STEP 5: TRACEABILITY
+// ============================================================
+async function generateTraceability() {
+  const sp = document.getElementById('spin-trace');
+  const st = document.getElementById('sts-trace');
+  sp.classList.add('on'); st.textContent = 'Building traceability matrix...';
+
+  const res = await(await fetch('/api/traceability', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ project_id: STATE.projectId })
+  })).json();
+
+  sp.classList.remove('on');
+
+  if (res.status === 'success') {
+    st.textContent = 'Done!';
+    document.getElementById('trace-output').style.display = 'block';
+    document.getElementById('trace-body').textContent = res.matrix;
+  } else {
+    st.textContent = 'Error: ' + (res.error || 'Unknown');
+  }
+}
+
+// ============================================================
+// DOWNLOAD
+// ============================================================
+function downloadDoc(type) {
+  const fn = type === 'srs' ? STATE.srsDocx : STATE.sddDocx;
+  if (fn) window.open('/api/download/' + fn, '_blank');
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+async function searchKB() {
+  const sp = document.getElementById('spin-search');
+  sp.classList.add('on');
+  const q = document.getElementById('sq').value;
+  const res = await(await fetch('/api/search', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({query:q, n_results:8})
+  })).json();
+  sp.classList.remove('on');
+
+  document.getElementById('search-res').innerHTML = (res.results||[]).map(r => `
+    <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;color:var(--acc);font-family:'IBM Plex Mono',monospace;margin-bottom:4px">
+        📁 ${r.metadata?.source_file||'?'} · ${r.collection} · §${r.metadata?.section_heading||''} · dist:${r.distance?.toFixed(3)}
+      </div>
+      <div style="font-size:12px;color:var(--dim);line-height:1.5">${r.text?.substring(0,400)}${r.text?.length>400?'...':''}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+loadStatus();
+loadProjects();
+</script>
+</body>
+</html>
