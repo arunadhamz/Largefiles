@@ -1,0 +1,2894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A.E.G.I.S. Command // Executive Tactical Platform [MK-VII]</title>
+  <style>
+    :root {
+      /* Premium Executive White Theme Palette */
+      --bg-base: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #ffffff;
+      --bg-card: rgba(255, 255, 255, 0.94);
+      --border-subtle: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --border-dark: #94a3b8;
+
+      /* High-contrast typography for executive presentations */
+      --text-main: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --text-faint: #94a3b8;
+      --text-inverse: #ffffff;
+
+      /* Tactical Mode Accent Colors (Vibrant on White) */
+      --accent-flow: #0284c7;
+      --accent-flow-light: #f0f9ff;
+      --accent-flow-border: #bae6fd;
+      --accent-flow-glow: rgba(2, 132, 199, 0.22);
+
+      --accent-surv: #059669;
+      --accent-surv-light: #f0fdf4;
+      --accent-surv-border: #bbf7d0;
+      --accent-surv-glow: rgba(5, 150, 105, 0.22);
+
+      --accent-lock: #ea580c;
+      --accent-lock-light: #fff7ed;
+      --accent-lock-border: #fed7aa;
+      --accent-lock-glow: rgba(234, 88, 12, 0.25);
+
+      --accent-beast: #dc2626;
+      --accent-beast-light: #fef2f2;
+      --accent-beast-border: #fecaca;
+      --accent-beast-glow: rgba(220, 38, 38, 0.3);
+
+      /* Typography Scale */
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 4px 14px -2px rgba(15, 23, 42, 0.07), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      --shadow-lg: 0 12px 28px -4px rgba(15, 23, 42, 0.09), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    /* Beast Mode Emergency Alert Style */
+    body.beast-mode-active {
+      --bg-base: #fff5f5;
+      --border-subtle: #fecaca;
+      --border-strong: #f87171;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      font-size: 14px;
+      line-height: 1.5;
+      background-image: 
+        radial-gradient(rgba(148, 163, 184, 0.2) 1.2px, transparent 1.2px),
+        linear-gradient(to right, rgba(226, 232, 240, 0.5) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(226, 232, 240, 0.5) 1px, transparent 1px);
+      background-size: 24px 24px, 120px 120px, 120px 120px;
+      transition: background-color 0.3s ease;
+    }
+
+    /* Top Emergency Alert Ribbon */
+    .beast-hazard-banner {
+      display: none;
+      background: repeating-linear-gradient(
+        -45deg,
+        #dc2626,
+        #dc2626 22px,
+        #b91c1c 22px,
+        #b91c1c 44px
+      );
+      color: #ffffff;
+      padding: 10px 20px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      box-shadow: 0 4px 18px rgba(220, 38, 38, 0.35);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      animation: hazardStrobe 1.6s infinite ease-in-out;
+    }
+
+    @keyframes hazardStrobe {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+
+    body.beast-mode-active .beast-hazard-banner {
+      display: block;
+    }
+
+    /* Presentation Tour Bar */
+    .client-tour-banner {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      z-index: 60;
+    }
+
+    .tour-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tour-pulse {
+      width: 10px;
+      height: 10px;
+      background: #38bdf8;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #38bdf8;
+      animation: tourPulse 1.4s infinite;
+    }
+    @keyframes tourPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    .tour-progress-track {
+      width: 180px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0 12px;
+    }
+    .tour-progress-bar {
+      height: 100%;
+      background: #38bdf8;
+      width: 0%;
+      transition: width 0.4s linear;
+    }
+
+    /* Tactical Framing Reticles */
+    .tactical-frame {
+      position: relative;
+    }
+    .tactical-frame::before,
+    .tactical-frame::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .tactical-frame::before {
+      top: 0;
+      left: 0;
+      border-top: 2.5px solid var(--border-dark);
+      border-left: 2.5px solid var(--border-dark);
+    }
+    .tactical-frame::after {
+      bottom: 0;
+      right: 0;
+      border-bottom: 2.5px solid var(--border-dark);
+      border-right: 2.5px solid var(--border-dark);
+    }
+
+    /* Header Styling */
+    header.tactical-header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0 28px;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo-mark {
+      width: 44px;
+      height: 44px;
+      border: 2px solid var(--accent-flow);
+      display: grid;
+      place-items: center;
+      background: var(--accent-flow-light);
+      border-radius: var(--radius-sm);
+      position: relative;
+    }
+    .brand-logo-mark::before {
+      content: '';
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--accent-flow);
+      transform: rotate(45deg);
+    }
+
+    .brand-title h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      background: #e2e8f0;
+      color: #1e293b;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-subtitle {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      margin-top: 1px;
+    }
+
+    /* Header Telemetry Ticker */
+    .header-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      font-family: var(--font-mono);
+    }
+
+    .telemetry-item {
+      display: flex;
+      flex-direction: column;
+      border-left: 2px solid var(--border-subtle);
+      padding-left: 16px;
+    }
+
+    .telemetry-label {
+      color: var(--text-muted);
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .telemetry-val {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent-surv);
+      box-shadow: 0 0 10px rgba(5, 150, 105, 0.6);
+      animation: pulseDot 2s infinite ease-in-out;
+    }
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-body);
+      height: 38px;
+      padding: 0 16px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 700;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn:hover {
+      border-color: var(--border-strong);
+      color: var(--text-main);
+      box-shadow: var(--shadow-sm);
+      transform: translateY(-1px);
+    }
+    .btn.primary {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+    }
+    .btn.primary:hover {
+      background: #0369a1;
+    }
+
+    /* Mode Navigation Tabs Bar */
+    nav.mode-nav-tabs {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 10px 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      overflow-x: auto;
+      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02);
+    }
+
+    .nav-tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 22px;
+      border: 1.5px solid var(--border-subtle);
+      background: #ffffff;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 14.5px;
+      color: var(--text-body);
+      letter-spacing: 0.4px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .nav-tab-btn:hover {
+      background: #f8fafc;
+      border-color: var(--border-strong);
+      color: var(--text-main);
+      transform: translateY(-1px);
+    }
+
+    .nav-tab-badge {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #f1f5f9;
+      color: var(--text-muted);
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    /* Tab Selected States */
+    .nav-tab-btn[data-mode="flow"].active {
+      border-color: var(--accent-flow);
+      background: linear-gradient(to bottom, #ffffff, var(--accent-flow-light));
+      color: var(--accent-flow);
+      box-shadow: 0 4px 14px var(--accent-flow-glow);
+    }
+    .nav-tab-btn[data-mode="flow"].active .nav-tab-badge {
+      background: var(--accent-flow);
+      color: #ffffff;
+    }
+
+    .nav-tab-btn[data-mode="surveillance"].active {
+      border-color: var(--accent-surv);
+      background: linear-gradient(to bottom, #ffffff, var(--accent-surv-light));
+      color: var(--accent-surv);
+      box-shadow: 0 4px 14px var(--accent-surv-glow);
+    }
+    .nav-tab-btn[data-mode="surveillance"].active .nav-tab-badge {
+      background: var(--accent-surv);
+      color: #ffffff;
+    }
+
+    .nav-tab-btn[data-mode="targetlock"].active {
+      border-color: var(--accent-lock);
+      background: linear-gradient(to bottom, #ffffff, var(--accent-lock-light));
+      color: var(--accent-lock);
+      box-shadow: 0 4px 14px var(--accent-lock-glow);
+    }
+    .nav-tab-btn[data-mode="targetlock"].active .nav-tab-badge {
+      background: var(--accent-lock);
+      color: #ffffff;
+    }
+
+    .nav-tab-btn[data-mode="beast"].active {
+      border-color: var(--accent-beast);
+      background: linear-gradient(to bottom, #ffffff, var(--accent-beast-light));
+      color: var(--accent-beast);
+      box-shadow: 0 4px 16px var(--accent-beast-glow);
+      animation: alertPulse 1.8s infinite;
+    }
+    .nav-tab-btn[data-mode="beast"].active .nav-tab-badge {
+      background: var(--accent-beast);
+      color: #ffffff;
+    }
+
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: 0 0 10px var(--accent-beast-glow); }
+      50% { box-shadow: 0 0 22px rgba(220, 38, 38, 0.55); }
+    }
+
+    /* Executive Mode Summary Strip */
+    .executive-briefing-strip {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-left: 5px solid var(--accent-flow);
+      border-radius: var(--radius-md);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .briefing-text {
+      flex: 1;
+    }
+    .briefing-title {
+      font-size: 13.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+    .briefing-desc {
+      font-size: 13.5px;
+      color: var(--text-body);
+      line-height: 1.45;
+    }
+    .briefing-stats-pills {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .stat-pill {
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      padding: 6px 12px;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .stat-pill-label { font-size: 9.5px; color: var(--text-muted); text-transform: uppercase; }
+    .stat-pill-val { font-size: 13.5px; font-weight: 800; color: var(--text-main); }
+
+    /* Main Viewport Container */
+    main.viewport-container {
+      flex: 1;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-section {
+      display: none;
+      flex-direction: column;
+      gap: 22px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .tab-section.active {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Common Card / Panel Styling */
+    .card {
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1.5px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(248, 250, 252, 0.85);
+    }
+
+    .card-title {
+      font-size: 14.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title-icon {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .card-tools {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ========================================================
+       TAB 1: FULL FLOW (PIPELINE & STREAMING METRICS)
+       ======================================================== */
+    .flow-pipeline-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+    }
+
+    .flow-node-card {
+      background: #ffffff;
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .flow-node-card:hover, .flow-node-card.selected {
+      border-color: var(--accent-flow);
+      box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-flow);
+      transform: translateY(-2px);
+    }
+
+    .flow-node-index {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent-flow);
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .flow-node-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin: 6px 0 12px;
+      color: var(--text-main);
+    }
+
+    .flow-node-stat {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      margin-top: 6px;
+      color: var(--text-body);
+    }
+    .flow-node-stat span:last-child {
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .flow-node-progress {
+      width: 100%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      margin-top: 14px;
+      overflow: hidden;
+    }
+
+    .flow-node-bar {
+      height: 100%;
+      background: var(--accent-flow);
+      width: 78%;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    /* Canvas visualizer */
+    .flow-canvas-container {
+      position: relative;
+      height: 330px;
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    #flowVisualizerCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Detailed Telemetry & Table Grid */
+    .flow-metrics-row {
+      display: grid;
+      grid-template-columns: 1.4fr 1.6fr;
+      gap: 20px;
+    }
+
+    .pipeline-dossier-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+    }
+    .pipeline-dossier-table th {
+      text-align: left;
+      padding: 10px 14px;
+      background: #f8fafc;
+      color: var(--text-muted);
+      border-bottom: 1.5px solid var(--border-subtle);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .pipeline-dossier-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-body);
+    }
+    .pipeline-dossier-table tr:hover td {
+      background: #f8fafc;
+    }
+
+    .terminal-feed {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      height: 250px;
+      overflow-y: auto;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 8px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 14px;
+      line-height: 1.45;
+      border-bottom: 1px solid #f8fafc;
+      padding-bottom: 4px;
+    }
+
+    .log-timestamp {
+      color: var(--text-muted);
+      flex-shrink: 0;
+      font-size: 11.5px;
+    }
+
+    .log-tag {
+      font-weight: 800;
+      flex-shrink: 0;
+      font-size: 11.5px;
+    }
+    .log-tag.flow { color: var(--accent-flow); }
+    .log-tag.surv { color: var(--accent-surv); }
+    .log-tag.lock { color: var(--accent-lock); }
+    .log-tag.warn { color: var(--accent-beast); }
+
+    .log-message {
+      color: var(--text-body);
+      flex: 1;
+      word-break: break-all;
+    }
+
+    /* ========================================================
+       TAB 2: SURVEILLANCE MATRIX & RADAR SWEEP
+       ======================================================== */
+    .surv-layout-grid {
+      display: grid;
+      grid-template-columns: 1.9fr 1.1fr;
+      gap: 20px;
+    }
+
+    .cams-matrix {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .cam-feed-card {
+      background: #ffffff;
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .cam-viewport {
+      height: 215px;
+      background: #f1f5f9;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cam-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .cam-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .cam-hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.85);
+      padding: 4px 8px;
+      border-radius: 4px;
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .cam-rec-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #dc2626;
+      font-weight: 800;
+      font-size: 11px;
+    }
+    .cam-rec-indicator::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: #dc2626;
+      border-radius: 50%;
+      animation: recBlink 1s infinite;
+    }
+    @keyframes recBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    .cam-footer-bar {
+      padding: 10px 14px;
+      background: #ffffff;
+      border-top: 1.5px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .radar-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .radar-display-wrapper {
+      position: relative;
+      height: 330px;
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    #radarCanvas {
+      width: 310px;
+      height: 310px;
+      display: block;
+    }
+
+    /* Environmental & Sensor Matrix */
+    .sensor-perimeter-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .sensor-node {
+      background: #ffffff;
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 8px;
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+    .sensor-node.ok .sensor-status { color: var(--accent-surv); font-weight: 800; }
+    .sensor-node.alert .sensor-status { color: var(--accent-beast); font-weight: 800; }
+    .sensor-name { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    .sensor-status { font-size: 12px; margin-top: 3px; }
+
+    /* PTZ Joystick & Lens Controller */
+    .ptz-widget-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 14px;
+      background: #f8fafc;
+      border-top: 1.5px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    /* ========================================================
+       TAB 3: TARGET LOCK & DETECTED (TACTICAL RETICLE)
+       ======================================================== */
+    .lock-layout-grid {
+      display: grid;
+      grid-template-columns: 1.8fr 1.2fr;
+      gap: 20px;
+    }
+
+    .lock-hud-container {
+      position: relative;
+      height: 520px;
+      background: #ffffff;
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    #targetHudCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .lock-hud-overlay-ui {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hud-telemetry-box {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1.5px solid var(--border-subtle);
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      width: fit-content;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .hud-lock-status-badge {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--accent-lock);
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--accent-lock-border);
+    }
+
+    .target-directory-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .target-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .target-item-card {
+      background: #ffffff;
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .target-item-card:hover {
+      border-color: var(--accent-lock);
+      transform: translateX(4px);
+    }
+
+    .target-item-card.locked {
+      border-color: var(--accent-lock);
+      background: linear-gradient(to right, #ffffff, var(--accent-lock-light));
+      box-shadow: 0 4px 16px var(--accent-lock-glow);
+    }
+    .target-item-card.locked::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      background: var(--accent-lock);
+      border-radius: var(--radius-md) 0 0 var(--radius-md);
+    }
+
+    .target-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .target-code {
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 14px;
+      color: var(--text-main);
+    }
+
+    .threat-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .threat-tag.critical { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+    .threat-tag.high { background: #ffedd5; color: #ea580c; border: 1px solid #fdba74; }
+    .threat-tag.moderate { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+
+    .target-subinfo {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-body);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .target-subinfo span b {
+      color: var(--text-main);
+    }
+
+    .fire-action-panel {
+      background: #ffffff;
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+
+    .engage-btn {
+      width: 100%;
+      height: 52px;
+      background: linear-gradient(135deg, #ea580c, #c2410c);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 16px rgba(234, 88, 12, 0.4);
+    }
+    .engage-btn:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 6px 22px rgba(234, 88, 12, 0.5);
+      transform: translateY(-1px);
+    }
+
+    /* ========================================================
+       TAB 4: BEAST MODE // ALERT OVERDRIVE
+       ======================================================== */
+    .beast-grid-container {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+    }
+
+    .beast-master-card {
+      background: #ffffff;
+      border: 2px solid #fca5a5;
+      border-radius: var(--radius-md);
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(220, 38, 38, 0.14);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+    }
+
+    .beast-mode-hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1.5px solid var(--border-subtle);
+      padding-bottom: 18px;
+    }
+
+    .beast-hero-title {
+      font-size: 21px;
+      font-weight: 900;
+      color: #dc2626;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .beast-toggle-switch {
+      position: relative;
+      width: 68px;
+      height: 34px;
+      background: #cbd5e1;
+      border-radius: 17px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .beast-toggle-switch.active {
+      background: #dc2626;
+      box-shadow: 0 0 16px rgba(220, 38, 38, 0.6);
+    }
+    .beast-toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #ffffff;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    }
+    .beast-toggle-switch.active::after {
+      transform: translateX(34px);
+    }
+
+    .overdrive-gauge-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .gauge-card {
+      background: #fdfdfd;
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      text-align: center;
+    }
+
+    .gauge-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .gauge-val {
+      font-family: var(--font-mono);
+      font-size: 28px;
+      font-weight: 800;
+      color: #dc2626;
+    }
+
+    .gauge-bar-track {
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .gauge-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ea580c, #dc2626);
+      width: 88%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .countermeasure-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .countermeasure-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: #ffffff;
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .countermeasure-btn:hover {
+      border-color: #dc2626;
+      background: #fef2f2;
+      color: #dc2626;
+      transform: translateY(-1px);
+    }
+
+    .emergency-scram-box {
+      border: 2px dashed #f87171;
+      background: #fff5f5;
+      padding: 18px;
+      border-radius: var(--radius-md);
+      text-align: center;
+      margin-top: auto;
+    }
+
+    .scram-btn {
+      width: 100%;
+      padding: 14px;
+      background: #dc2626;
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45);
+      transition: all 0.2s;
+    }
+    .scram-btn:hover {
+      background: #b91c1c;
+      transform: scale(1.01);
+    }
+
+    /* Modal for SCRAM */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      place-items: center;
+    }
+    .modal-backdrop.open {
+      display: grid;
+    }
+    .modal-card {
+      background: #ffffff;
+      border: 2px solid #dc2626;
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+
+    /* Global Footer */
+    footer.tactical-footer {
+      background: #ffffff;
+      border-top: 1.5px solid var(--border-subtle);
+      padding: 10px 28px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Badges */
+    .badge {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .badge-primary { background: var(--accent-flow-light); color: var(--accent-flow); border: 1px solid var(--accent-flow-border); }
+    .badge-success { background: var(--accent-surv-light); color: var(--accent-surv); border: 1px solid var(--accent-surv-border); }
+    .badge-alert { background: var(--accent-beast-light); color: var(--accent-beast); border: 1px solid var(--accent-beast-border); }
+
+    /* Print / PDF Styling */
+    @media print {
+      header.tactical-header, .client-tour-banner, .header-controls, .engage-btn, .scram-btn {
+        display: none !important;
+      }
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      .card {
+        box-shadow: none !important;
+        border: 1px solid #999 !important;
+      }
+    }
+
+    @media (max-width: 1200px) {
+      .flow-pipeline-grid { grid-template-columns: repeat(3, 1fr); }
+      .surv-layout-grid, .lock-layout-grid, .beast-grid-container { grid-template-columns: 1fr; }
+      .flow-metrics-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Beast / Alert Mode Emergency Banner -->
+  <div class="beast-hazard-banner" id="beastHazardBanner">
+    ⚠ LEVEL 1 DEFENSE GRID OVERDRIVE ACTIVE // MAXIMUM THREAT NEUTRALIZATION ARMED // KINETIC RESTRICTIONS BYPASSED ⚠
+  </div>
+
+  <!-- Client Presentation Tour Bar -->
+  <div class="client-tour-banner" id="clientTourBanner">
+    <div class="tour-indicator">
+      <div class="tour-pulse"></div>
+      <span><b>EXECUTIVE PRESENTATION MODE:</b> <span id="tourStepText">Mode 01: Full Flow Pipeline Telemetry</span></span>
+    </div>
+    <div style="display: flex; align-items: center;">
+      <span style="font-size: 11.5px; color: #94a3b8;">AUTO TOUR:</span>
+      <div class="tour-progress-track">
+        <div class="tour-progress-bar" id="tourProgressBar"></div>
+      </div>
+      <button class="btn" id="toggleTourBtn" style="height: 28px; padding: 0 10px; font-size: 11px; background: #334155; color: #fff; border: none;">
+        ⏸ PAUSE TOUR
+      </button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="tactical-header">
+    <div class="brand-group">
+      <div class="brand-logo-mark"></div>
+      <div class="brand-title">
+        <h1>A.E.G.I.S. Command <span class="brand-badge">MK-VII ENTERPRISE</span></h1>
+        <div class="brand-subtitle">NEXT-GEN MULTI-DOMAIN SURVEILLANCE & ACTIVE TARGET INTERCEPT</div>
+      </div>
+    </div>
+
+    <div class="header-telemetry">
+      <div class="telemetry-item">
+        <span class="telemetry-label">SYSTEM HEALTH</span>
+        <span class="telemetry-val"><span class="status-dot"></span> 99.999% NOMINAL</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">DEFCON POSTURE</span>
+        <span class="telemetry-val" id="defconIndicator" style="color: #0284c7;">DEFCON 4 (MONITORING)</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">INFERENCE LATENCY</span>
+        <span class="telemetry-val" id="telemetryPing">1.64 ms</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">MISSION UTC TIME</span>
+        <span class="telemetry-val" id="zuluTime">00:00:00.000 UTC</span>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <button class="btn" id="audioToggleBtn" title="Toggle Tactical Audio Feedback">
+        <span id="audioIcon">🔊</span> AUDIO: <span id="audioState">ON</span>
+      </button>
+      <button class="btn primary" id="simDataBtn" title="Inject Simulated High-Throughput Packet Surge">
+        ⚡ SIMULATE SURGE
+      </button>
+      <button class="btn" id="printReportBtn" title="Print Executive Dossier">
+        🖨 EXPORT PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs (Four Presentation Modes) -->
+  <nav class="mode-nav-tabs">
+    <button class="nav-tab-btn active" data-mode="flow">
+      <span class="nav-tab-badge">01</span>
+      <span>FULL FLOW PIPELINE</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="surveillance">
+      <span class="nav-tab-badge">02</span>
+      <span>SURVEILLANCE MATRIX</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="targetlock">
+      <span class="nav-tab-badge">03</span>
+      <span>TARGET LOCK & DETECT</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="beast">
+      <span class="nav-tab-badge">04</span>
+      <span>BEAST MODE // ALERT</span>
+    </button>
+  </nav>
+
+  <!-- Main Viewport -->
+  <main class="viewport-container">
+
+    <!-- ==========================================
+         MODE 1: FULL FLOW (PIPELINE & STREAMING)
+         ========================================== -->
+    <section class="tab-section active" id="mode-flow">
+      <!-- Executive Briefing Strip -->
+      <div class="executive-briefing-strip">
+        <div class="briefing-text">
+          <div class="briefing-title">
+            <span style="color: var(--accent-flow);">●</span>
+            EXECUTIVE ARCHITECTURE OVERVIEW: END-TO-END SENSOR-TO-SHOOTER PIPELINE
+          </div>
+          <div class="briefing-desc">
+            Multi-gigabit hardware-accelerated pipeline fusing raw LIDAR, FLIR thermal, acoustic arrays, and RF sensors with zero-copy DMA buffers into tensor neural cores. Sub-2ms end-to-end latency with continuous threat classification.
+          </div>
+        </div>
+        <div class="briefing-stats-pills">
+          <div class="stat-pill">
+            <span class="stat-pill-label">SUSTAINED INGEST</span>
+            <span class="stat-pill-val" style="color: #0284c7;">48.2 GB/s</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">FRAME DROPS</span>
+            <span class="stat-pill-val" style="color: #059669;">0.000%</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">NEURAL FPS</span>
+            <span class="stat-pill-val">1,840 FPS</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pipeline Stage Nodes -->
+      <div class="flow-pipeline-grid">
+        <div class="flow-node-card selected tactical-frame" data-step="0">
+          <div class="flow-node-index">NODE 01 // SENSORS</div>
+          <div class="flow-node-title">Sensor Ingest Array</div>
+          <div class="flow-node-stat"><span>Optical & LIDAR</span><span>48.2 GB/s</span></div>
+          <div class="flow-node-stat"><span>RF Packet Influx</span><span>1.45 M/s</span></div>
+          <div class="flow-node-stat"><span>Bus Bandwidth</span><span>PCIe Gen 5</span></div>
+          <div class="flow-node-progress"><div class="flow-node-bar" style="width: 86%;"></div></div>
+        </div>
+
+        <div class="flow-node-card tactical-frame" data-step="1">
+          <div class="flow-node-index">NODE 02 // PARSER</div>
+          <div class="flow-node-title">Quantum Deserializer</div>
+          <div class="flow-node-stat"><span>Queue Depth</span><span>8 Frames</span></div>
+          <div class="flow-node-stat"><span>Serialization Jitter</span><span>0.012 ms</span></div>
+          <div class="flow-node-stat"><span>Zero-Copy Buffer</span><span>4096 MB</span></div>
+          <div class="flow-node-progress"><div class="flow-node-bar" style="width: 68%;"></div></div>
+        </div>
+
+        <div class="flow-node-card tactical-frame" data-step="2">
+          <div class="flow-node-index">NODE 03 // NEURAL</div>
+          <div class="flow-node-title">YOLO-Omni Inference</div>
+          <div class="flow-node-stat"><span>Precision Format</span><span>FP8 Tensor</span></div>
+          <div class="flow-node-stat"><span>Inference Latency</span><span>1.84 ms</span></div>
+          <div class="flow-node-stat"><span>Confidence F1</span><span>99.8%</span></div>
+          <div class="flow-node-progress"><div class="flow-node-bar" style="width: 94%;"></div></div>
+        </div>
+
+        <div class="flow-node-card tactical-frame" data-step="3">
+          <div class="flow-node-index">NODE 04 // THREAT</div>
+          <div class="flow-node-title">Vector Heuristics</div>
+          <div class="flow-node-stat"><span>Threat Vectors</span><span>24 Tracks</span></div>
+          <div class="flow-node-stat"><span>Trajectory Drift</span><span>&lt;0.05m</span></div>
+          <div class="flow-node-stat"><span>Classification</span><span>AUTONOMOUS</span></div>
+          <div class="flow-node-progress"><div class="flow-node-bar" style="width: 52%;"></div></div>
+        </div>
+
+        <div class="flow-node-card tactical-frame" data-step="4">
+          <div class="flow-node-index">NODE 05 // ACTION</div>
+          <div class="flow-node-title">Actuator Intercept Hub</div>
+          <div class="flow-node-stat"><span>Turret Slew Rate</span><span>380°/sec</span></div>
+          <div class="flow-node-stat"><span>Gimbal Stabilization</span><span>0.02 mrad</span></div>
+          <div class="flow-node-stat"><span>Kill-Chain State</span><span>HOT STANDBY</span></div>
+          <div class="flow-node-progress"><div class="flow-node-bar" style="width: 78%;"></div></div>
+        </div>
+      </div>
+
+      <!-- Live Pipeline Visualizer Canvas -->
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-title-icon" style="background: var(--accent-flow);"></span>
+            REAL-TIME DATA TRANSIT BUS & PIPELINE STAGE CORRELATOR
+          </div>
+          <div class="card-tools">
+            <span>CLOCK: 3.8 GHz SYNC</span>
+            <span>•</span>
+            <span style="color: var(--accent-flow); font-weight: 800;">BUS SPEED: OPTIMAL</span>
+          </div>
+        </div>
+        <div class="flow-canvas-container">
+          <canvas id="flowVisualizerCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Table & Log Feed -->
+      <div class="flow-metrics-row">
+        <!-- Hardware Telemetry Table -->
+        <div class="card tactical-frame">
+          <div class="card-header">
+            <div class="card-title">SUBSYSTEM HARDWARE AUDIT</div>
+            <div class="card-tools"><span class="badge badge-primary">ACTIVE SPEC</span></div>
+          </div>
+          <table class="pipeline-dossier-table">
+            <thead>
+              <tr>
+                <th>Hardware Module</th>
+                <th>Throughput</th>
+                <th>Latency</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Optics Pre-Processor</b></td>
+                <td>18.4 GB/s</td>
+                <td>0.42 ms</td>
+                <td><span style="color: #059669; font-weight: 800;">VERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><b>LIDAR Voxel Grid</b></td>
+                <td>14.8 GB/s</td>
+                <td>0.68 ms</td>
+                <td><span style="color: #059669; font-weight: 800;">VERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><b>Tensor Neural Array</b></td>
+                <td>1,840 FPS</td>
+                <td>1.84 ms</td>
+                <td><span style="color: #059669; font-weight: 800;">LOCKED</span></td>
+              </tr>
+              <tr>
+                <td><b>Kalman Trajectory Filter</b></td>
+                <td>62 k-pts/s</td>
+                <td>0.12 ms</td>
+                <td><span style="color: #059669; font-weight: 800;">NOMINAL</span></td>
+              </tr>
+              <tr>
+                <td><b>Kinetic Slew Actuator</b></td>
+                <td>380°/s</td>
+                <td>0.95 ms</td>
+                <td><span style="color: #ea580c; font-weight: 800;">ARMED</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Terminal Log Feed -->
+        <div class="card tactical-frame">
+          <div class="card-header">
+            <div class="card-title">LIVE TELEMETRY EVENT STREAM</div>
+            <div class="card-tools"><span class="badge badge-primary">REALTIME FEED</span></div>
+          </div>
+          <div class="terminal-feed" id="flowLogFeed">
+            <!-- Dynamic entries injected here -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         MODE 2: SURVEILLANCE MATRIX & RADAR
+         ========================================== -->
+    <section class="tab-section" id="mode-surveillance">
+      <!-- Executive Briefing Strip -->
+      <div class="executive-briefing-strip" style="border-left-color: var(--accent-surv);">
+        <div class="briefing-text">
+          <div class="briefing-title">
+            <span style="color: var(--accent-surv);">●</span>
+            SURVEILLANCE SUITE: MULTI-SPECTRAL AIR & GROUND RECONNAISSANCE
+          </div>
+          <div class="briefing-desc">
+            Simultaneous multi-sensor perimeter coverage integrating 360° Doppler radar sweeps, aerial UAV gimbal telemetry, thermal FLIR imaging, and micro-acoustic perimeter ground sensors.
+          </div>
+        </div>
+        <div class="briefing-stats-pills">
+          <div class="stat-pill">
+            <span class="stat-pill-label">RADAR RANGE</span>
+            <span class="stat-pill-val" style="color: #059669;">5,000 M</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">CAMERA FEEDS</span>
+            <span class="stat-pill-val">4 QUAD 4K</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">ACTIVE BLIPS</span>
+            <span class="stat-pill-val" style="color: #ea580c;">3 HOSTILE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="surv-layout-grid">
+        <!-- Multi-Camera Matrix -->
+        <div class="cams-matrix">
+          <!-- Cam 01 -->
+          <div class="cam-feed-card tactical-frame">
+            <div class="cam-viewport">
+              <canvas class="cam-canvas" id="camCanvas1"></canvas>
+              <div class="cam-overlay">
+                <div class="cam-hud-header">
+                  <span>CAM-01 [NORTH GATE PERIMETER]</span>
+                  <span class="cam-rec-indicator">LIVE REC</span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: #1e293b; background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 4px; width: fit-content; font-weight: 700;">
+                  THERMAL FLIR: 38.4°C HEAT BLOB DETECTED
+                </div>
+              </div>
+            </div>
+            <div class="cam-footer-bar">
+              <span>FOV: 84° WIDE // SENSITIVITY: HIGH</span>
+              <span style="color: var(--accent-surv); font-weight: 800;">SPECTRUM: FLIR IR</span>
+            </div>
+          </div>
+
+          <!-- Cam 02 -->
+          <div class="cam-feed-card tactical-frame">
+            <div class="cam-viewport">
+              <canvas class="cam-canvas" id="camCanvas2"></canvas>
+              <div class="cam-overlay">
+                <div class="cam-hud-header">
+                  <span>CAM-02 [AERIAL GIMBAL UAV-4]</span>
+                  <span class="cam-rec-indicator">LIVE REC</span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: #1e293b; background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 4px; width: fit-content; font-weight: 700;">
+                  ALTITUDE: 420m // AZIMUTH: 182° // STABLE
+                </div>
+              </div>
+            </div>
+            <div class="cam-footer-bar">
+              <span>LIDAR TERRAIN MESH: ACTIVE</span>
+              <span style="color: var(--accent-surv); font-weight: 800;">OPTICAL 4K ULTRA</span>
+            </div>
+          </div>
+
+          <!-- Cam 03 -->
+          <div class="cam-feed-card tactical-frame">
+            <div class="cam-viewport">
+              <canvas class="cam-canvas" id="camCanvas3"></canvas>
+              <div class="cam-overlay">
+                <div class="cam-hud-header">
+                  <span>CAM-03 [SUB-LEVEL REACTOR CORRIDOR]</span>
+                  <span class="cam-rec-indicator">LIVE REC</span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: #1e293b; background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 4px; width: fit-content; font-weight: 700;">
+                  CORRIDOR ACCESS: RESTRICTED // ZERO MOTION
+                </div>
+              </div>
+            </div>
+            <div class="cam-footer-bar">
+              <span>NIGHT VISION IR: ILLUMINATED</span>
+              <span style="color: var(--accent-surv); font-weight: 800;">SECURITY: CLEAR</span>
+            </div>
+          </div>
+
+          <!-- Cam 04 -->
+          <div class="cam-feed-card tactical-frame">
+            <div class="cam-viewport">
+              <canvas class="cam-canvas" id="camCanvas4"></canvas>
+              <div class="cam-overlay">
+                <div class="cam-hud-header">
+                  <span>CAM-04 [EAST TOWER SENTRY]</span>
+                  <span class="cam-rec-indicator">LIVE REC</span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: #1e293b; background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 4px; width: fit-content; font-weight: 700;">
+                  OPTICAL ZOOM: 24.5x // RANGE: 3,200m
+                </div>
+              </div>
+            </div>
+            <div class="cam-footer-bar">
+              <span>ATMOSPHERIC DRIFT: 0.2 mrad</span>
+              <span style="color: var(--accent-lock); font-weight: 800;">TARGET ACQUIRED</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Radar & Environmental Pane -->
+        <div class="radar-pane">
+          <div class="card tactical-frame">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-title-icon" style="background: var(--accent-surv);"></span>
+                360° DOPPLER RADAR SWEEP
+              </div>
+              <div class="card-tools"><span class="badge badge-success">5 KM RANGE</span></div>
+            </div>
+            <div class="radar-display-wrapper">
+              <canvas id="radarCanvas"></canvas>
+            </div>
+            <div class="ptz-widget-row">
+              <div>AZIMUTH: <b id="radarAzimuth">048° NNE</b></div>
+              <div>SWEEP RATE: <b>30 RPM</b></div>
+            </div>
+          </div>
+
+          <!-- Micro-sensors Status -->
+          <div class="card tactical-frame">
+            <div class="card-header">
+              <div class="card-title">PERIMETER GROUND SENSOR MATRIX</div>
+            </div>
+            <div style="padding: 16px;">
+              <div class="sensor-perimeter-grid">
+                <div class="sensor-node ok">
+                  <div class="sensor-name">SEC-N01</div>
+                  <div class="sensor-status">ACTIVE</div>
+                </div>
+                <div class="sensor-node ok">
+                  <div class="sensor-name">SEC-N02</div>
+                  <div class="sensor-status">ACTIVE</div>
+                </div>
+                <div class="sensor-node alert">
+                  <div class="sensor-name">SEC-E01</div>
+                  <div class="sensor-status">PING!</div>
+                </div>
+                <div class="sensor-node ok">
+                  <div class="sensor-name">SEC-E02</div>
+                  <div class="sensor-status">ACTIVE</div>
+                </div>
+                <div class="sensor-node ok">
+                  <div class="sensor-name">SEC-S01</div>
+                  <div class="sensor-status">ACTIVE</div>
+                </div>
+                <div class="sensor-node ok">
+                  <div class="sensor-name">SEC-S02</div>
+                  <div class="sensor-status">ACTIVE</div>
+                </div>
+                <div class="sensor-node ok">
+                  <div class="sensor-name">SEC-W01</div>
+                  <div class="sensor-status">ACTIVE</div>
+                </div>
+                <div class="sensor-node ok">
+                  <div class="sensor-name">SEC-W02</div>
+                  <div class="sensor-status">ACTIVE</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         MODE 3: TARGET LOCK & DETECTED
+         ========================================== -->
+    <section class="tab-section" id="mode-targetlock">
+      <!-- Executive Briefing Strip -->
+      <div class="executive-briefing-strip" style="border-left-color: var(--accent-lock);">
+        <div class="briefing-text">
+          <div class="briefing-title">
+            <span style="color: var(--accent-lock);">●</span>
+            TACTICAL TARGET LOCK & FIRE CONTROL INTERCEPT INTERFACE
+          </div>
+          <div class="briefing-desc">
+            Autonomous multi-target acquisition HUD with predictive ballistic lead calculation, real-time kinetic intercept solution verification, and armed engagement controls for high-speed threats.
+          </div>
+        </div>
+        <div class="briefing-stats-pills">
+          <div class="stat-pill">
+            <span class="stat-pill-label">LOCK CONFIDENCE</span>
+            <span class="stat-pill-val" style="color: #059669;">99.82%</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">ESTIMATED TTI</span>
+            <span class="stat-pill-val" style="color: #dc2626;">4.2 SEC</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">PROBABILITY OF KILL</span>
+            <span class="stat-pill-val">Pk 98.4%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="lock-layout-grid">
+        <!-- Tactical HUD Canvas & Overlays -->
+        <div class="lock-hud-container tactical-frame">
+          <canvas id="targetHudCanvas"></canvas>
+          <div class="lock-hud-overlay-ui">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div class="hud-telemetry-box">
+                <div style="color: var(--text-muted); font-size: 10px; font-weight: 700;">TACTICAL CONTACT DOSSIER</div>
+                <div style="font-size: 16px; font-weight: 900; color: #ea580c; margin-top: 2px;" id="hudTargetName">HOSTILE UAV (SHADOW-X4)</div>
+                <div style="margin-top: 6px; display: flex; gap: 14px; font-size: 13px;">
+                  <span>ALT: <b id="hudTargetAlt">1,240m</b></span>
+                  <span>VEL: <b id="hudTargetSpeed">640 km/h</b></span>
+                  <span>IFF: <b style="color: #dc2626;">HOSTILE</b></span>
+                </div>
+              </div>
+
+              <div class="hud-lock-status-badge">
+                <span class="status-dot" style="background: #ea580c; box-shadow: 0 0 12px rgba(234,88,12,0.9);"></span>
+                <span id="hudLockState">ACTIVE LOCK-ON READY</span>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+              <div class="hud-telemetry-box">
+                <div>BEARING: <b id="hudBearing">048° NE</b> | ELEVATION: <b>+14.2°</b></div>
+                <div style="margin-top: 4px;">TIME TO INTERCEPT (TTI): <b id="hudTTI" style="color: #dc2626; font-size: 15px;">4.2 SECONDS</b></div>
+              </div>
+
+              <div class="hud-telemetry-box" style="text-align: right;">
+                <div style="font-size: 10px; color: var(--text-muted); font-weight: 700;">INTERCEPT SOLUTION</div>
+                <div style="font-size: 20px; font-weight: 900; color: #059669;">Pk = 98.4%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Target Selector & Fire Control Pane -->
+        <div class="target-directory-pane">
+          <div class="card tactical-frame">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-title-icon" style="background: var(--accent-lock);"></span>
+                DETECTED THREAT CATALOG
+              </div>
+              <div class="card-tools">
+                <span class="badge" style="background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa;">3 DETECTED</span>
+              </div>
+            </div>
+            <div style="padding: 16px;">
+              <div class="target-list">
+                <!-- Target 1 -->
+                <div class="target-item-card locked" data-target="0">
+                  <div class="target-header-row">
+                    <span class="target-code">#TGT-ALPHA // HOSTILE UAV (SHADOW-X4)</span>
+                    <span class="threat-tag critical">CRITICAL</span>
+                  </div>
+                  <div class="target-subinfo">
+                    <span>RANGE: <b>1,420 m</b></span>
+                    <span>VELOCITY: <b>640 km/h (Mach 0.52)</b></span>
+                    <span>HEADING: <b>048° NE</b></span>
+                    <span>SIGNATURE: <b>RADAR + FLIR (98%)</b></span>
+                  </div>
+                </div>
+
+                <!-- Target 2 -->
+                <div class="target-item-card" data-target="1">
+                  <div class="target-header-row">
+                    <span class="target-code">#TGT-BRAVO // ARMORED CARRIER (BMP-X)</span>
+                    <span class="threat-tag high">HIGH</span>
+                  </div>
+                  <div class="target-subinfo">
+                    <span>RANGE: <b>890 m</b></span>
+                    <span>VELOCITY: <b>85 km/h</b></span>
+                    <span>HEADING: <b>112° ESE</b></span>
+                    <span>SIGNATURE: <b>ACOUSTIC + SEISMIC</b></span>
+                  </div>
+                </div>
+
+                <!-- Target 3 -->
+                <div class="target-item-card" data-target="2">
+                  <div class="target-header-row">
+                    <span class="target-code">#TGT-CHARLIE // PERIMETER INTRUDER</span>
+                    <span class="threat-tag moderate">MODERATE</span>
+                  </div>
+                  <div class="target-subinfo">
+                    <span>RANGE: <b>320 m</b></span>
+                    <span>VELOCITY: <b>12 km/h</b></span>
+                    <span>HEADING: <b>310° NW</b></span>
+                    <span>SIGNATURE: <b>BIOMETRIC / IR</b></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fire Authorization & Intercept -->
+          <div class="card fire-action-panel tactical-frame">
+            <div style="font-family: var(--font-mono); font-size: 13px; color: var(--text-body); margin-bottom: 14px; display: flex; justify-content: space-between;">
+              <span>COUNTERMEASURE: <b>HIGH-VELOCITY KINETIC SLUG</b></span>
+              <span style="color: var(--accent-surv); font-weight: 800;">RADAR ALIGNED</span>
+            </div>
+            <button class="engage-btn" id="engageLockBtn">
+              ⚡ AUTHORIZE & ENGAGE TARGET LOCK
+            </button>
+            <div style="margin-top: 10px; text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+              ROE PROTOCOL: AUTOMATED THREAT INTERCEPT UPON OPERATOR CONFIRMATION
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         MODE 4: BEAST MODE // ALERT OVERDRIVE
+         ========================================== -->
+    <section class="tab-section" id="mode-beast">
+      <!-- Executive Briefing Strip -->
+      <div class="executive-briefing-strip" style="border-left-color: var(--accent-beast);">
+        <div class="briefing-text">
+          <div class="briefing-title">
+            <span style="color: var(--accent-beast);">●</span>
+            BEAST MODE OVERDRIVE: EMERGENCY COMBAT OVERCLOCKING PROTOCOL
+          </div>
+          <div class="briefing-desc">
+            Emergency protocol bypassing standard civilian limits: raises reactor core output to 194%, locks down perimeter blast barriers, deploys high-power electromagnetic pulses, and arms kinetic turrets in autonomous free-fire mode.
+          </div>
+        </div>
+        <div class="briefing-stats-pills">
+          <div class="stat-pill">
+            <span class="stat-pill-label">REACTOR LOAD</span>
+            <span class="stat-pill-val" style="color: #dc2626;" id="briefingCoreVal">194% OVERCLOCK</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">RAILGUN CHARGE</span>
+            <span class="stat-pill-val" style="color: #059669;">99.8% READY</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">DEFENSE GRID</span>
+            <span class="stat-pill-val" style="color: #dc2626;">MAX LETHAL</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="beast-grid-container">
+        <!-- Master Overdrive Panel -->
+        <div class="beast-master-card tactical-frame">
+          <div class="beast-mode-hero">
+            <div>
+              <div class="beast-hero-title">
+                <span>🔥</span> BEAST MODE // DEFENSE OVERDRIVE
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 13px; color: var(--text-body); margin-top: 6px;">
+                UNRESTRICTED POWER SURGE // LEVEL-1 CODE RED
+              </div>
+            </div>
+            <div class="beast-toggle-switch active" id="beastMasterToggle" title="Toggle Overdrive Beast Mode"></div>
+          </div>
+
+          <!-- Gauges Grid -->
+          <div class="overdrive-gauge-grid">
+            <div class="gauge-card">
+              <div class="gauge-label">REACTOR CORE OUTPUT</div>
+              <div class="gauge-val" id="beastCoreVal">194%</div>
+              <div class="gauge-bar-track">
+                <div class="gauge-bar-fill" id="beastCoreBar" style="width: 98%;"></div>
+              </div>
+            </div>
+
+            <div class="gauge-card">
+              <div class="gauge-label">CRYOGENIC COOLING BYPASS</div>
+              <div class="gauge-val" style="color: #0284c7;">-42°C</div>
+              <div class="gauge-bar-track">
+                <div class="gauge-bar-fill" style="width: 85%; background: #0284c7;"></div>
+              </div>
+            </div>
+
+            <div class="gauge-card">
+              <div class="gauge-label">KINETIC RAILGUN CHARGE</div>
+              <div class="gauge-val">99.8%</div>
+              <div class="gauge-bar-track">
+                <div class="gauge-bar-fill" style="width: 99.8%;"></div>
+              </div>
+            </div>
+
+            <div class="gauge-card">
+              <div class="gauge-label">PLASMA DEFENSE SHIELD</div>
+              <div class="gauge-val" style="color: #059669;">HARDENED</div>
+              <div class="gauge-bar-track">
+                <div class="gauge-bar-fill" style="width: 100%; background: #059669;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Countermeasures -->
+          <div>
+            <div style="font-size: 13px; font-weight: 800; color: var(--text-main); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-mono);">
+              ACTIVE COUNTERMEASURE SUITE (INSTANT DEPLOY)
+            </div>
+            <div class="countermeasure-list">
+              <button class="countermeasure-btn" id="btnShields">
+                <span>🛡 DEPLOY MAXIMUM PLASMA PERIMETER SHIELDS</span>
+                <span class="badge badge-success">ACTIVE [100%]</span>
+              </button>
+              <button class="countermeasure-btn" id="btnEmp">
+                <span>⚡ DISCHARGE 500MW REGIONAL EMP WAVE BURST</span>
+                <span class="badge badge-alert">PRIMED & READY</span>
+              </button>
+              <button class="countermeasure-btn" id="btnJamming">
+                <span>📡 ALL-BAND SPECTRUM ELECTRONIC COUNTERMEASURES (ECM)</span>
+                <span class="badge badge-primary">ENGAGED</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SCRAM Failsafe -->
+          <div class="emergency-scram-box">
+            <div style="font-family: var(--font-mono); font-size: 13px; color: #dc2626; font-weight: 800; margin-bottom: 8px;">
+              EMERGENCY FAILSAFE // COLD SHUTDOWN INTERLOCK
+            </div>
+            <button class="scram-btn" id="openScramModal">
+              ☠ INITIATE EMERGENCY SYSTEM SCRAM
+            </button>
+          </div>
+        </div>
+
+        <!-- Overdrive Combat Dispatch Log -->
+        <div class="card tactical-frame" style="display: flex; flex-direction: column;">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon" style="background: #dc2626;"></span>
+              BEAST MODE COMBAT INCIDENT LOG
+            </div>
+            <div class="card-tools"><span class="badge badge-alert">CRITICAL DISPATCH</span></div>
+          </div>
+          <div style="padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 18px;">
+            <div style="background: #fff5f5; border: 1.5px solid #fecaca; padding: 14px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12.5px; color: #b91c1c; line-height: 1.5;">
+              <b>OVERDRIVE RULES OF ENGAGEMENT:</b> All civilian velocity and thermal safeguards are bypassed. Directed energy laser batteries, acoustic disrupters, and drone interception swarms operating with unrestricted autonomous authority.
+            </div>
+
+            <div class="card-title" style="font-size: 13px;">REAL-TIME OVERCLOCK SPECIFICATIONS</div>
+            <div style="font-family: var(--font-mono); font-size: 12.5px; display: flex; flex-direction: column; gap: 10px; color: var(--text-body);">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+                <span>TURRET TRAVERSE SPEED:</span>
+                <b style="color: #dc2626;">720°/sec (OVERCLOCK 200%)</b>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+                <span>REACTOR THERMAL FLUX:</span>
+                <b style="color: #ea580c;">842°C [STABILIZERS BYPASSED]</b>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+                <span>AUTONOMOUS INTERCEPT ENGAGEMENT:</span>
+                <b style="color: #dc2626;">HOT WEAPONS FREE</b>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding-bottom: 4px;">
+                <span>INTERCEPT DRONE SWARM:</span>
+                <b style="color: #059669;">48 UNITS AIRBORNE</b>
+              </div>
+            </div>
+
+            <div class="terminal-feed" id="beastLogFeed" style="height: 220px; margin-top: auto;">
+              <!-- Dynamic Beast logs -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Emergency SCRAM Modal -->
+  <div class="modal-backdrop" id="scramModal">
+    <div class="modal-card">
+      <div style="font-size: 40px; margin-bottom: 12px;">🚨</div>
+      <h3 style="font-size: 20px; font-weight: 900; color: #dc2626; margin-bottom: 10px;">CONFIRM EMERGENCY SYSTEM SCRAM</h3>
+      <p style="font-size: 14px; color: var(--text-body); margin-bottom: 24px; line-height: 1.5;">
+        Executing a hard system SCRAM will immediately damp reactor rods, vent cryogenic fluids, drop magnetic containment shields, and sever remote telemetry.
+      </p>
+      <div style="display: flex; gap: 14px;">
+        <button class="btn" id="cancelScramBtn" style="flex: 1; height: 46px; justify-content: center; font-size: 13px;">
+          ABORT SCRAM
+        </button>
+        <button class="scram-btn" id="confirmScramBtn" style="flex: 1; height: 46px; padding: 0;">
+          EXECUTE COLD SCRAM
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Global Status Bar -->
+  <footer class="tactical-footer">
+    <div>A.E.G.I.S. DEFENSE PLATFORM // SEC-CLEARANCE: LEVEL-5 (TOP SECRET EXECUTIVE BRIEFING)</div>
+    <div style="display: flex; gap: 24px;">
+      <span>CRYPTO HASH: <b style="color: #0284c7;">0x8F94...4C91-MK7</b></span>
+      <span>ACTIVE PROCESSING NODES: <b style="color: #059669;">1,024 CLUSTERS</b></span>
+      <span>MISSION STATUS: <b style="color: #059669;">READY</b></span>
+    </div>
+  </footer>
+
+  <!-- ==========================================
+       INTERACTIVE JAVASCRIPT & AUDIO ENGINE
+       ========================================== -->
+  <script>
+    /* ========================================================
+       1. WEB AUDIO PROCEDURAL SYNTHESIZER
+       ======================================================== */
+    class TacticalAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playClick() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(320, this.ctx.currentTime + 0.05);
+
+        gain.gain.setValueAtTime(0.09, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.05);
+      }
+
+      playLockPing() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(920, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(1840, this.ctx.currentTime + 0.08);
+
+        gain.gain.setValueAtTime(0.14, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+      }
+
+      playAlertSiren() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(650, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(1050, this.ctx.currentTime + 0.16);
+        osc.frequency.linearRampToValueAtTime(650, this.ctx.currentTime + 0.32);
+
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.32);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.32);
+      }
+    }
+
+    const audio = new TacticalAudioEngine();
+
+    // Audio toggle button
+    const audioToggleBtn = document.getElementById('audioToggleBtn');
+    const audioState = document.getElementById('audioState');
+    const audioIcon = document.getElementById('audioIcon');
+    audioToggleBtn.addEventListener('click', () => {
+      audio.enabled = !audio.enabled;
+      if (audio.enabled) {
+        audio.init();
+        audioState.textContent = 'ON';
+        audioIcon.textContent = '🔊';
+        audioToggleBtn.classList.remove('primary');
+        audio.playClick();
+      } else {
+        audioState.textContent = 'OFF';
+        audioIcon.textContent = '🔇';
+        audioToggleBtn.classList.add('primary');
+      }
+    });
+
+    /* ========================================================
+       2. TAB NAVIGATION SYSTEM (4 PRESENTATION MODES)
+       ======================================================== */
+    const tabButtons = document.querySelectorAll('.nav-tab-btn');
+    const tabSections = document.querySelectorAll('.tab-section');
+    const defconIndicator = document.getElementById('defconIndicator');
+
+    const modeTitles = {
+      flow: "Mode 01: Full Flow Pipeline Telemetry",
+      surveillance: "Mode 02: Multi-Sector Surveillance & Doppler Radar",
+      targetlock: "Mode 03: Target Lock & Predictive Intercept HUD",
+      beast: "Mode 04: Beast Mode // Defense Overdrive"
+    };
+
+    function switchMode(targetMode, triggeredByTour = false) {
+      if (!triggeredByTour) audio.playClick();
+
+      tabButtons.forEach(btn => {
+        if (btn.getAttribute('data-mode') === targetMode) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      tabSections.forEach(sec => {
+        if (sec.id === `mode-${targetMode}`) {
+          sec.classList.add('active');
+        } else {
+          sec.classList.remove('active');
+        }
+      });
+
+      // Update DEFCON state based on mode
+      if (targetMode === 'flow') {
+        defconIndicator.textContent = 'DEFCON 4 (MONITORING)';
+        defconIndicator.style.color = '#0284c7';
+      } else if (targetMode === 'surveillance') {
+        defconIndicator.textContent = 'DEFCON 3 (SURVEILLANCE)';
+        defconIndicator.style.color = '#059669';
+      } else if (targetMode === 'targetlock') {
+        defconIndicator.textContent = 'DEFCON 2 (INTERCEPT)';
+        defconIndicator.style.color = '#ea580c';
+        audio.playLockPing();
+      } else if (targetMode === 'beast') {
+        defconIndicator.textContent = 'DEFCON 1 (OVERDRIVE)';
+        defconIndicator.style.color = '#dc2626';
+        audio.playAlertSiren();
+      }
+
+      document.getElementById('tourStepText').textContent = modeTitles[targetMode];
+    }
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-mode');
+        switchMode(mode);
+      });
+    });
+
+    /* ========================================================
+       3. CLIENT PRESENTATION AUTO TOUR
+       ======================================================== */
+    const tourModes = ['flow', 'surveillance', 'targetlock', 'beast'];
+    let currentTourIdx = 0;
+    let tourActive = true;
+    let tourProgress = 0;
+    const tourProgressBar = document.getElementById('tourProgressBar');
+    const toggleTourBtn = document.getElementById('toggleTourBtn');
+
+    function runTourCycle() {
+      if (!tourActive) return;
+      tourProgress += 1;
+      if (tourProgress > 100) {
+        tourProgress = 0;
+        currentTourIdx = (currentTourIdx + 1) % tourModes.length;
+        switchMode(tourModes[currentTourIdx], true);
+      }
+      tourProgressBar.style.width = tourProgress + '%';
+    }
+    const tourInterval = setInterval(runTourCycle, 120);
+
+    toggleTourBtn.addEventListener('click', () => {
+      audio.playClick();
+      tourActive = !tourActive;
+      if (tourActive) {
+        toggleTourBtn.textContent = '⏸ PAUSE TOUR';
+        toggleTourBtn.style.background = '#334155';
+      } else {
+        toggleTourBtn.textContent = '▶ RESUME TOUR';
+        toggleTourBtn.style.background = '#0284c7';
+      }
+    });
+
+    /* Print / PDF Export */
+    document.getElementById('printReportBtn').addEventListener('click', () => {
+      audio.playClick();
+      window.print();
+    });
+
+    /* ========================================================
+       4. TOP BAR CLOCK & TELEMETRY TICKER
+       ======================================================== */
+    const zuluTimeEl = document.getElementById('zuluTime');
+    const pingEl = document.getElementById('telemetryPing');
+
+    function updateClocks() {
+      const now = new Date();
+      const zulu = now.toISOString().replace('T', ' ').replace('Z', ' UTC');
+      zuluTimeEl.textContent = zulu.slice(11, 23) + ' UTC';
+
+      if (Math.random() < 0.2) {
+        const p = (1.4 + Math.random() * 0.5).toFixed(2);
+        pingEl.textContent = `${p} ms`;
+      }
+      requestAnimationFrame(updateClocks);
+    }
+    requestAnimationFrame(updateClocks);
+
+    /* ========================================================
+       5. TAB 1: FULL FLOW CANVAS GRAPH & LOGS
+       ======================================================== */
+    const flowCanvas = document.getElementById('flowVisualizerCanvas');
+    const flowCtx = flowCanvas.getContext('2d');
+    let flowWidth, flowHeight;
+
+    function resizeFlowCanvas() {
+      const rect = flowCanvas.parentElement.getBoundingClientRect();
+      flowCanvas.width = rect.width * window.devicePixelRatio;
+      flowCanvas.height = rect.height * window.devicePixelRatio;
+      flowWidth = rect.width;
+      flowHeight = rect.height;
+      flowCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    window.addEventListener('resize', resizeFlowCanvas);
+    resizeFlowCanvas();
+
+    // Flow particles
+    const flowParticles = [];
+    for (let i = 0; i < 45; i++) {
+      flowParticles.push({
+        x: Math.random() * 1000,
+        y: 0,
+        speed: 1.8 + Math.random() * 2.8,
+        lane: 0,
+        size: 3 + Math.random() * 2.5,
+        alpha: 0.6 + Math.random() * 0.4
+      });
+    }
+
+    const flowStages = [
+      { name: "OPTICAL / SENSORS", xRatio: 0.1 },
+      { name: "DESERIALIZER", xRatio: 0.3 },
+      { name: "YOLO-OMNI INFERENCE", xRatio: 0.5 },
+      { name: "VECTOR HEURISTICS", xRatio: 0.7 },
+      { name: "ACTUATOR DISPATCH", xRatio: 0.9 }
+    ];
+
+    function drawFlowCanvas() {
+      if (!flowWidth) return;
+      flowCtx.clearRect(0, 0, flowWidth, flowHeight);
+
+      // Subtle background grid
+      flowCtx.strokeStyle = 'rgba(226, 232, 240, 0.7)';
+      flowCtx.lineWidth = 1;
+      const step = 32;
+      for (let x = 0; x < flowWidth; x += step) {
+        flowCtx.beginPath();
+        flowCtx.moveTo(x, 0);
+        flowCtx.lineTo(x, flowHeight);
+        flowCtx.stroke();
+      }
+      for (let y = 0; y < flowHeight; y += step) {
+        flowCtx.beginPath();
+        flowCtx.moveTo(0, y);
+        flowCtx.lineTo(flowWidth, y);
+        flowCtx.stroke();
+      }
+
+      // Horizontal main bus lanes
+      const centerY = flowHeight / 2;
+      const lanes = [-55, -20, 15, 50];
+      lanes.forEach(offset => {
+        flowCtx.beginPath();
+        flowCtx.moveTo(30, centerY + offset);
+        flowCtx.lineTo(flowWidth - 30, centerY + offset);
+        flowCtx.strokeStyle = 'rgba(2, 132, 199, 0.22)';
+        flowCtx.lineWidth = 2.5;
+        flowCtx.stroke();
+      });
+
+      // Stage milestone lines and nodes
+      flowStages.forEach((stage) => {
+        const sx = flowWidth * stage.xRatio;
+        flowCtx.beginPath();
+        flowCtx.moveTo(sx, 30);
+        flowCtx.lineTo(sx, flowHeight - 30);
+        flowCtx.strokeStyle = 'rgba(203, 213, 225, 0.9)';
+        flowCtx.setLineDash([5, 5]);
+        flowCtx.stroke();
+        flowCtx.setLineDash([]);
+
+        // Node pillar circles
+        lanes.forEach(offset => {
+          flowCtx.beginPath();
+          flowCtx.arc(sx, centerY + offset, 5.5, 0, Math.PI * 2);
+          flowCtx.fillStyle = '#ffffff';
+          flowCtx.strokeStyle = '#0284c7';
+          flowCtx.lineWidth = 2.5;
+          flowCtx.fill();
+          flowCtx.stroke();
+        });
+
+        // Stage title badge
+        flowCtx.fillStyle = '#334155';
+        flowCtx.font = 'bold 12px "JetBrains Mono", monospace';
+        flowCtx.textAlign = 'center';
+        flowCtx.fillText(stage.name, sx, flowHeight - 14);
+      });
+
+      // Update and draw live data packet pulses
+      flowParticles.forEach(p => {
+        p.x += p.speed;
+        if (p.x > flowWidth - 30) {
+          p.x = 30;
+          p.lane = lanes[Math.floor(Math.random() * lanes.length)];
+        }
+        if (!p.lane) p.lane = lanes[Math.floor(Math.random() * lanes.length)];
+
+        // Pulse dot
+        flowCtx.beginPath();
+        flowCtx.arc(p.x, centerY + p.lane, p.size, 0, Math.PI * 2);
+        flowCtx.fillStyle = `rgba(2, 132, 199, ${p.alpha})`;
+        flowCtx.shadowColor = 'rgba(2, 132, 199, 0.6)';
+        flowCtx.shadowBlur = 8;
+        flowCtx.fill();
+        flowCtx.shadowBlur = 0;
+      });
+
+      requestAnimationFrame(drawFlowCanvas);
+    }
+    requestAnimationFrame(drawFlowCanvas);
+
+    // Dynamic Flow Log Generator
+    const flowLogFeed = document.getElementById('flowLogFeed');
+    const logTemplates = [
+      { tag: 'flow', msg: 'Zero-copy pipeline ingested frame bundle #9402-AX (4.2 MB) without bus wait' },
+      { tag: 'flow', msg: 'FP8 Tensor Engine verified matrix sync across 8 GPU clusters [3.8 GHz]' },
+      { tag: 'surv', msg: 'Optical Cam-01 tracking cluster refreshed: azimuth alignment delta 0.02°' },
+      { tag: 'lock', msg: 'Kalman predictor calculated optimal intercept firing solution for Target-Alpha' },
+      { tag: 'flow', msg: 'LIDAR point cloud point count: 1,840,000 pts // Zero occlusions found' },
+      { tag: 'warn', msg: 'Atmospheric density compensation applied: +0.4% velocity modifier' }
+    ];
+
+    function appendFlowLog(tag, message) {
+      const now = new Date();
+      const ts = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.innerHTML = `
+        <span class="log-timestamp">${ts}</span>
+        <span class="log-tag ${tag}">[${tag.toUpperCase()}]</span>
+        <span class="log-message">${message}</span>
+      `;
+      flowLogFeed.prepend(line);
+      if (flowLogFeed.children.length > 50) {
+        flowLogFeed.removeChild(flowLogFeed.lastChild);
+      }
+    }
+
+    logTemplates.forEach(t => appendFlowLog(t.tag, t.msg));
+    setInterval(() => {
+      const rand = logTemplates[Math.floor(Math.random() * logTemplates.length)];
+      appendFlowLog(rand.tag, rand.msg);
+    }, 2600);
+
+    // Burst Test Button
+    document.getElementById('simDataBtn').addEventListener('click', () => {
+      audio.playClick();
+      appendFlowLog('flow', '>>> SIMULATED HIGH-THROUGHPUT PACKET BURST: 120,000 FRAMES/SEC INJECTED <<<');
+      for (let i = 0; i < 25; i++) {
+        flowParticles.push({
+          x: 30 + Math.random() * 60,
+          speed: 4.5 + Math.random() * 4,
+          size: 3.5,
+          alpha: 0.95,
+          lane: [-55, -20, 15, 50][Math.floor(Math.random() * 4)]
+        });
+      }
+    });
+
+    /* ========================================================
+       6. TAB 2: SURVEILLANCE PROCEDURAL CAMERAS & RADAR
+       ======================================================== */
+    const cams = [
+      { id: 'camCanvas1', type: 'thermal' },
+      { id: 'camCanvas2', type: 'aerial' },
+      { id: 'camCanvas3', type: 'corridor' },
+      { id: 'camCanvas4', type: 'longrange' }
+    ];
+
+    cams.forEach(camInfo => {
+      const cvs = document.getElementById(camInfo.id);
+      const ctx = cvs.getContext('2d');
+      let t = 0;
+
+      function renderCam() {
+        const w = cvs.width = cvs.parentElement.clientWidth;
+        const h = cvs.height = cvs.parentElement.clientHeight;
+        t += 0.03;
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, w, h);
+
+        // Fine grid
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < w; x += 28) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+        }
+        for (let y = 0; y < h; y += 28) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+        }
+
+        if (camInfo.type === 'thermal') {
+          const bx = w * 0.5 + Math.sin(t) * 45;
+          const by = h * 0.55 + Math.cos(t * 0.8) * 18;
+          const grad = ctx.createRadialGradient(bx, by, 6, bx, by, 45);
+          grad.addColorStop(0, 'rgba(234, 88, 12, 0.8)');
+          grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.35)');
+          grad.addColorStop(1, 'transparent');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(bx, by, 45, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = '#ea580c';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(bx - 30, by - 30, 60, 60);
+          ctx.fillStyle = '#ea580c';
+          ctx.font = 'bold 11px "JetBrains Mono", monospace';
+          ctx.fillText('TARGET #1 [FLIR 98.6%]', bx - 30, by - 36);
+        } else if (camInfo.type === 'aerial') {
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, h * 0.5); ctx.lineTo(w, h * 0.5);
+          ctx.stroke();
+
+          const cx = w / 2, cy = h / 2;
+          ctx.strokeStyle = '#0284c7';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 32, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(cx - 44, cy); ctx.lineTo(cx - 12, cy);
+          ctx.moveTo(cx + 12, cy); ctx.lineTo(cx + 44, cy);
+          ctx.moveTo(cx, cy - 44); ctx.lineTo(cx, cy - 12);
+          ctx.moveTo(cx, cy + 12); ctx.lineTo(cx, cy + 44);
+          ctx.stroke();
+        } else if (camInfo.type === 'corridor') {
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 2;
+          const cx = w / 2, cy = h / 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0); ctx.lineTo(cx - 35, cy - 22);
+          ctx.moveTo(w, 0); ctx.lineTo(cx + 35, cy - 22);
+          ctx.moveTo(0, h); ctx.lineTo(cx - 35, cy + 22);
+          ctx.moveTo(w, h); ctx.lineTo(cx + 35, cy + 22);
+          ctx.strokeRect(cx - 35, cy - 22, 70, 44);
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = '#059669';
+          ctx.lineWidth = 1.5;
+          const scanY = (t * 45) % h;
+          ctx.beginPath();
+          ctx.moveTo(0, scanY); ctx.lineTo(w, scanY);
+          ctx.stroke();
+
+          ctx.fillStyle = 'rgba(5, 150, 105, 0.1)';
+          ctx.fillRect(0, Math.max(0, scanY - 35), w, 35);
+        }
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.025)';
+        for (let y = 0; y < h; y += 4) {
+          ctx.fillRect(0, y, w, 1);
+        }
+
+        requestAnimationFrame(renderCam);
+      }
+      requestAnimationFrame(renderCam);
+    });
+
+    // Radar Canvas
+    const radarCanvas = document.getElementById('radarCanvas');
+    const radarCtx = radarCanvas.getContext('2d');
+    let radarAngle = 0;
+
+    const radarBlips = [
+      { dist: 80, angle: 0.8, life: 1, label: 'TGT-ALPHA [UAV]' },
+      { dist: 120, angle: 2.4, life: 1, label: 'TGT-BRAVO [CARRIER]' },
+      { dist: 50, angle: 4.1, life: 1, label: 'SEC-INTRUDER' }
+    ];
+
+    function renderRadar() {
+      const size = 310;
+      radarCanvas.width = size * window.devicePixelRatio;
+      radarCanvas.height = size * window.devicePixelRatio;
+      radarCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+
+      const cx = size / 2;
+      const cy = size / 2;
+      radarCtx.clearRect(0, 0, size, size);
+
+      // Concentric circles
+      const rings = [40, 80, 115, 145];
+      rings.forEach((r, idx) => {
+        radarCtx.beginPath();
+        radarCtx.arc(cx, cy, r, 0, Math.PI * 2);
+        radarCtx.strokeStyle = 'rgba(5, 150, 105, 0.3)';
+        radarCtx.lineWidth = 1.2;
+        radarCtx.stroke();
+
+        radarCtx.fillStyle = 'rgba(5, 150, 105, 0.7)';
+        radarCtx.font = 'bold 10px "JetBrains Mono", monospace';
+        radarCtx.fillText(`${(idx + 1) * 1.25}km`, cx + 6, cy - r + 11);
+      });
+
+      // Crosshairs
+      radarCtx.strokeStyle = 'rgba(5, 150, 105, 0.25)';
+      radarCtx.beginPath();
+      radarCtx.moveTo(cx, cy - 150); radarCtx.lineTo(cx, cy + 150);
+      radarCtx.moveTo(cx - 150, cy); radarCtx.lineTo(cx + 150, cy);
+      radarCtx.stroke();
+
+      radarAngle += 0.024;
+      if (radarAngle > Math.PI * 2) radarAngle = 0;
+
+      // Azimuth degrees
+      const deg = Math.floor((radarAngle * 180 / Math.PI));
+      document.getElementById('radarAzimuth').textContent = `${String(deg).padStart(3, '0')}° DEG`;
+
+      // Sweep Beam Arc
+      radarCtx.save();
+      radarCtx.beginPath();
+      radarCtx.moveTo(cx, cy);
+      radarCtx.arc(cx, cy, 145, radarAngle - 0.45, radarAngle);
+      radarCtx.closePath();
+      const sweepGrad = radarCtx.createRadialGradient(cx, cy, 10, cx, cy, 145);
+      sweepGrad.addColorStop(0, 'rgba(5, 150, 105, 0.25)');
+      sweepGrad.addColorStop(1, 'rgba(5, 150, 105, 0.0)');
+      radarCtx.fillStyle = sweepGrad;
+      radarCtx.fill();
+
+      // Main Sweep Ray
+      radarCtx.beginPath();
+      radarCtx.moveTo(cx, cy);
+      radarCtx.lineTo(cx + Math.cos(radarAngle) * 145, cy + Math.sin(radarAngle) * 145);
+      radarCtx.strokeStyle = '#059669';
+      radarCtx.lineWidth = 2.5;
+      radarCtx.stroke();
+      radarCtx.restore();
+
+      // Draw Blips
+      radarBlips.forEach(blip => {
+        const bx = cx + Math.cos(blip.angle) * blip.dist;
+        const by = cy + Math.sin(blip.angle) * blip.dist;
+
+        const diff = Math.abs(radarAngle - blip.angle);
+        if (diff < 0.06 || Math.abs(diff - Math.PI * 2) < 0.06) {
+          blip.life = 1;
+        } else {
+          blip.life = Math.max(0.2, blip.life - 0.005);
+        }
+
+        radarCtx.beginPath();
+        radarCtx.arc(bx, by, 4.5, 0, Math.PI * 2);
+        radarCtx.fillStyle = `rgba(220, 38, 38, ${blip.life})`;
+        radarCtx.shadowColor = 'rgba(220, 38, 38, 0.9)';
+        radarCtx.shadowBlur = 8;
+        radarCtx.fill();
+        radarCtx.shadowBlur = 0;
+
+        radarCtx.fillStyle = `rgba(15, 23, 42, ${blip.life})`;
+        radarCtx.font = 'bold 9.5px "JetBrains Mono", monospace';
+        radarCtx.fillText(blip.label, bx + 8, by + 4);
+      });
+
+      requestAnimationFrame(renderRadar);
+    }
+    requestAnimationFrame(renderRadar);
+
+    /* ========================================================
+       7. TAB 3: TARGET LOCK / DETECTED (TACTICAL RETICLE)
+       ======================================================== */
+    const hudCanvas = document.getElementById('targetHudCanvas');
+    const hudCtx = hudCanvas.getContext('2d');
+    let hudTargetX = 0, hudTargetY = 0;
+    let hudReticleAngle = 0;
+
+    const targetsData = [
+      { name: "HOSTILE UAV (SHADOW-X4)", alt: "1,240m", vel: "640 km/h", bearing: "048° NE", tti: "4.2 SEC" },
+      { name: "ARMORED CARRIER (BMP-X)", alt: "GROUND", vel: "85 km/h", bearing: "112° ESE", tti: "8.7 SEC" },
+      { name: "PERIMETER INTRUDER (PERSONNEL)", alt: "GROUND", vel: "12 km/h", bearing: "310° NW", tti: "15.1 SEC" }
+    ];
+
+    let selectedTargetIdx = 0;
+
+    const targetCards = document.querySelectorAll('.target-item-card');
+    targetCards.forEach(card => {
+      card.addEventListener('click', () => {
+        audio.playLockPing();
+        targetCards.forEach(c => c.classList.remove('locked'));
+        card.classList.add('locked');
+        selectedTargetIdx = parseInt(card.getAttribute('data-target'));
+
+        const data = targetsData[selectedTargetIdx];
+        document.getElementById('hudTargetName').textContent = data.name;
+        document.getElementById('hudTargetAlt').textContent = data.alt;
+        document.getElementById('hudTargetSpeed').textContent = data.vel;
+        document.getElementById('hudBearing').textContent = data.bearing;
+        document.getElementById('hudTTI').textContent = data.tti;
+      });
+    });
+
+    function drawTargetHud() {
+      const rect = hudCanvas.parentElement.getBoundingClientRect();
+      const w = hudCanvas.width = rect.width * window.devicePixelRatio;
+      const h = hudCanvas.height = rect.height * window.devicePixelRatio;
+      hudCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+
+      const width = rect.width;
+      const height = rect.height;
+      hudCtx.clearRect(0, 0, width, height);
+
+      // Fine grid background
+      hudCtx.strokeStyle = 'rgba(234, 88, 12, 0.1)';
+      hudCtx.lineWidth = 1;
+      for (let x = 0; x < width; x += 32) {
+        hudCtx.beginPath(); hudCtx.moveTo(x, 0); hudCtx.lineTo(x, height); hudCtx.stroke();
+      }
+      for (let y = 0; y < height; y += 32) {
+        hudCtx.beginPath(); hudCtx.moveTo(0, y); hudCtx.lineTo(width, y); hudCtx.stroke();
+      }
+
+      // Smooth tracking to target center
+      const targetDestX = width * 0.5 + Math.sin(Date.now() * 0.0016) * 70;
+      const targetDestY = height * 0.5 + Math.cos(Date.now() * 0.0019) * 45;
+      hudTargetX += (targetDestX - hudTargetX) * 0.08;
+      hudTargetY += (targetDestY - hudTargetY) * 0.08;
+
+      hudReticleAngle += 0.016;
+
+      hudCtx.save();
+      hudCtx.translate(hudTargetX, hudTargetY);
+
+      // Outer Rotating Bracket Ring
+      hudCtx.beginPath();
+      hudCtx.arc(0, 0, 95, hudReticleAngle, hudReticleAngle + Math.PI * 0.4);
+      hudCtx.arc(0, 0, 95, hudReticleAngle + Math.PI, hudReticleAngle + Math.PI * 1.4);
+      hudCtx.strokeStyle = '#ea580c';
+      hudCtx.lineWidth = 2.5;
+      hudCtx.stroke();
+
+      // Inner Counter-Rotating Precision Ring
+      hudCtx.beginPath();
+      hudCtx.arc(0, 0, 60, -hudReticleAngle * 1.5, -hudReticleAngle * 1.5 + Math.PI * 0.6);
+      hudCtx.arc(0, 0, 60, -hudReticleAngle * 1.5 + Math.PI, -hudReticleAngle * 1.5 + Math.PI * 1.6);
+      hudCtx.strokeStyle = 'rgba(234, 88, 12, 0.8)';
+      hudCtx.lineWidth = 2;
+      hudCtx.stroke();
+
+      // 4 Corner Lock Brackets
+      const bSize = 40;
+      const bLen = 16;
+      hudCtx.strokeStyle = '#ea580c';
+      hudCtx.lineWidth = 3;
+
+      // Top-Left
+      hudCtx.beginPath();
+      hudCtx.moveTo(-bSize, -bSize + bLen);
+      hudCtx.lineTo(-bSize, -bSize);
+      hudCtx.lineTo(-bSize + bLen, -bSize);
+      hudCtx.stroke();
+
+      // Top-Right
+      hudCtx.beginPath();
+      hudCtx.moveTo(bSize - bLen, -bSize);
+      hudCtx.lineTo(bSize, -bSize);
+      hudCtx.lineTo(bSize, -bSize + bLen);
+      hudCtx.stroke();
+
+      // Bottom-Left
+      hudCtx.beginPath();
+      hudCtx.moveTo(-bSize, bSize - bLen);
+      hudCtx.lineTo(-bSize, bSize);
+      hudCtx.lineTo(-bSize + bLen, bSize);
+      hudCtx.stroke();
+
+      // Bottom-Right
+      hudCtx.beginPath();
+      hudCtx.moveTo(bSize - bLen, bSize);
+      hudCtx.lineTo(bSize, bSize);
+      hudCtx.lineTo(bSize, bSize - bLen);
+      hudCtx.stroke();
+
+      // Center Crosshair Dot
+      hudCtx.beginPath();
+      hudCtx.arc(0, 0, 4, 0, Math.PI * 2);
+      hudCtx.fillStyle = '#dc2626';
+      hudCtx.fill();
+
+      // Floating Reticle Label
+      hudCtx.fillStyle = '#ea580c';
+      hudCtx.font = 'bold 12px "JetBrains Mono", monospace';
+      hudCtx.fillText(`LOCK: [TGT-${selectedTargetIdx + 1}]`, bSize + 12, -bSize + 12);
+      hudCtx.fillText(`SOL: Pk 98.4%`, bSize + 12, -bSize + 28);
+
+      hudCtx.restore();
+
+      requestAnimationFrame(drawTargetHud);
+    }
+    requestAnimationFrame(drawTargetHud);
+
+    // Engage Lock Button
+    document.getElementById('engageLockBtn').addEventListener('click', () => {
+      audio.playLockPing();
+      const hudState = document.getElementById('hudLockState');
+      hudState.textContent = 'INTERCEPT WEAPONS ARMED';
+      hudState.style.color = '#dc2626';
+      appendFlowLog('lock', `INTERCEPT FIRE COMMAND CONFIRMED: Vector targeting ${targetsData[selectedTargetIdx].name}`);
+    });
+
+    /* ========================================================
+       8. TAB 4: BEAST MODE // ALERT OVERDRIVE LOGIC
+       ======================================================== */
+    const beastToggle = document.getElementById('beastMasterToggle');
+    let beastModeActive = true; // Started active for high impact
+
+    function setBeastMode(active) {
+      beastModeActive = active;
+      if (beastModeActive) {
+        document.body.classList.add('beast-mode-active');
+        beastToggle.classList.add('active');
+        document.getElementById('beastCoreVal').textContent = '194% [MAX]';
+        document.getElementById('beastCoreBar').style.width = '98%';
+        audio.playAlertSiren();
+        appendBeastLog('CRITICAL: Beast Mode Overdrive Authorized. Thermal threshold bypass active.');
+        appendBeastLog('KINETIC DEFENSE: High-voltage rail capacitors energized.');
+      } else {
+        document.body.classList.remove('beast-mode-active');
+        beastToggle.classList.remove('active');
+        document.getElementById('beastCoreVal').textContent = '148%';
+        document.getElementById('beastCoreBar').style.width = '75%';
+        audio.playClick();
+        appendBeastLog('INFO: Beast Mode deactivated. System returning to standard defense level.');
+      }
+    }
+
+    beastToggle.addEventListener('click', () => {
+      setBeastMode(!beastModeActive);
+    });
+
+    const beastLogFeed = document.getElementById('beastLogFeed');
+    function appendBeastLog(msg) {
+      const now = new Date();
+      const ts = now.toTimeString().split(' ')[0];
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.innerHTML = `
+        <span class="log-timestamp">${ts}</span>
+        <span class="log-tag warn">[OVERDRIVE]</span>
+        <span class="log-message">${msg}</span>
+      `;
+      beastLogFeed.prepend(div);
+    }
+
+    appendBeastLog('High-voltage plasma shield generators active and synchronized.');
+    appendBeastLog('Kinetic railgun capacitor bank charged to 99.8% capacity.');
+    appendBeastLog('Autonomous threat interlock primed for instant interception.');
+
+    // Countermeasure buttons
+    document.getElementById('btnShields').addEventListener('click', () => {
+      audio.playClick();
+      appendBeastLog('PLASMA SHIELD: Boundary flux raised to 100%. Hardened against kinetic slugs.');
+    });
+    document.getElementById('btnEmp').addEventListener('click', () => {
+      audio.playLockPing();
+      appendBeastLog('EMP BURST: 500MW wave dispatched across 360° regional radius.');
+    });
+    document.getElementById('btnJamming').addEventListener('click', () => {
+      audio.playClick();
+      appendBeastLog('ECM JAMMING: All RF communications bands saturated with white noise.');
+    });
+
+    /* SCRAM Modal */
+    const scramModal = document.getElementById('scramModal');
+    document.getElementById('openScramModal').addEventListener('click', () => {
+      audio.playAlertSiren();
+      scramModal.classList.add('open');
+    });
+
+    document.getElementById('cancelScramBtn').addEventListener('click', () => {
+      audio.playClick();
+      scramModal.classList.remove('open');
+    });
+
+    document.getElementById('confirmScramBtn').addEventListener('click', () => {
+      audio.playAlertSiren();
+      scramModal.classList.remove('open');
+      setBeastMode(false);
+      appendBeastLog('☠ SCRAM EXECUTED: All reactors damped. Containment grid lockdown initiated.');
+      alert('A.E.G.I.S. SCRAM PROTOCOL COMPLETE: System safely cooled to cold standby.');
+    });
+  </script>
+</body>
+</html>
