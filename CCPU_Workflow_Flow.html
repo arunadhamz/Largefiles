@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCPU — Mode-Based Algorithm Flow &amp; OSS Data Path</title>
+<style>
+  :root{
+    /* Executive light theme tokens */
+    --bg-base:#f8fafc; --bg-surface:#ffffff; --bg-card:rgba(255,255,255,.94);
+    --border-subtle:#e2e8f0; --border-strong:#cbd5e1; --border-dark:#94a3b8;
+    --text-main:#0f172a; --text-body:#334155; --text-muted:#64748b; --text-faint:#94a3b8;
+    /* Mode accents (01 blue · 02 orange · 03 red · 04 green) */
+    --a1:#0284c7; --a1l:#f0f9ff; --a1b:#bae6fd; --a1g:rgba(2,132,199,.22);
+    --a2:#ea580c; --a2l:#fff7ed; --a2b:#fed7aa; --a2g:rgba(234,88,12,.25);
+    --a3:#dc2626; --a3l:#fef2f2; --a3b:#fecaca; --a3g:rgba(220,38,38,.30);
+    --a4:#059669; --a4l:#f0fdf4; --a4b:#bbf7d0; --a4g:rgba(5,150,105,.22);
+    --mono:Arial,Helvetica,sans-serif;
+    --sans:Arial,Helvetica,sans-serif;
+    --shadow-sm:0 1px 3px rgba(15,23,42,.05);
+    --shadow-md:0 4px 14px -2px rgba(15,23,42,.07),0 2px 6px -1px rgba(15,23,42,.04);
+    --shadow-lg:0 12px 28px -4px rgba(15,23,42,.09),0 4px 12px -2px rgba(15,23,42,.04);
+    --r-sm:4px; --r-md:8px; --r-lg:12px;
+    /* Doc role colors (preserved from pipeline doc) */
+    --seq:#d97706; --par:#4f46e5; --gpu:#0891b2; --od:#2563eb; --gap:#dc2626;
+    --out:#7c3aed; --src:#64748b; --stn:#475569; --mod:#16a34a; --ptp:#0e7490; --extb:#64748b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{
+    font-family:var(--sans);font-size:14px;line-height:1.5;color:var(--text-main);
+    min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;
+    background-color:var(--bg-base);
+    background-image:
+      radial-gradient(rgba(148,163,184,.2) 1.2px,transparent 1.2px),
+      linear-gradient(to right,rgba(226,232,240,.5) 1px,transparent 1px),
+      linear-gradient(to bottom,rgba(226,232,240,.5) 1px,transparent 1px);
+    background-size:24px 24px,120px 120px,120px 120px;
+  }
+
+  /* ============ hazard banner (Mode 03 only) ============ */
+  .hazard-banner{
+    display:none;height:38px;padding:0 20px;align-items:center;justify-content:center;
+    background:repeating-linear-gradient(-45deg,#dc2626,#dc2626 22px,#b91c1c 22px,#b91c1c 44px);
+    color:#fff;text-align:center;font-family:var(--mono);font-size:12px;font-weight:800;
+    letter-spacing:1.6px;text-transform:uppercase;box-shadow:0 4px 18px rgba(220,38,38,.35);
+    position:sticky;top:0;z-index:120;animation:hazardStrobe 1.6s infinite ease-in-out;
+  }
+  @keyframes hazardStrobe{0%,100%{opacity:1}50%{opacity:.85}}
+  body.mode-3 .hazard-banner{display:flex}
+
+  /* ============ sticky header ============ */
+  header.tactical-header{
+    background:rgba(255,255,255,.95);backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--border-subtle);
+    padding:0 26px;min-height:72px;
+    display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;
+    position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm);
+  }
+  body.mode-3 header.tactical-header{top:38px}
+  .brand-group{display:flex;align-items:center;gap:14px}
+  .brand-logo-mark{
+    width:42px;height:42px;border:2px solid var(--a1);display:grid;place-items:center;
+    background:var(--a1l);border-radius:var(--r-sm);position:relative;flex-shrink:0;
+    transition:border-color .3s,background .3s;
+  }
+  .brand-logo-mark::before{content:'';width:16px;height:16px;border:2px solid var(--a1);transform:rotate(45deg);transition:border-color .3s}
+  body.mode-2 .brand-logo-mark{border-color:var(--a2);background:var(--a2l)} body.mode-2 .brand-logo-mark::before{border-color:var(--a2)}
+  body.mode-3 .brand-logo-mark{border-color:var(--a3);background:var(--a3l)} body.mode-3 .brand-logo-mark::before{border-color:var(--a3)}
+  body.mode-4 .brand-logo-mark{border-color:var(--a4);background:var(--a4l)} body.mode-4 .brand-logo-mark::before{border-color:var(--a4)}
+  .brand-title h1{font-size:17px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text-main);display:flex;align-items:center;gap:10px}
+  .brand-badge{font-family:var(--mono);font-size:10.5px;font-weight:800;background:#e2e8f0;color:#1e293b;padding:3px 8px;border-radius:4px;letter-spacing:.5px}
+  .header-controls{display:flex;align-items:center;gap:10px}
+  .btn{
+    background:#fff;border:1px solid var(--border-subtle);color:var(--text-body);
+    min-height:36px;padding:0 14px;font-family:var(--mono);font-size:11.5px;font-weight:700;
+    border-radius:var(--r-sm);cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+    transition:all .2s cubic-bezier(.4,0,.2,1);letter-spacing:.3px;
+  }
+  .btn:hover{border-color:var(--border-strong);color:var(--text-main);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+
+  /* ============ mode nav tabs ============ */
+  nav.mode-nav-tabs{
+    background:#fff;border-bottom:1px solid var(--border-subtle);
+    padding:10px 26px;display:flex;align-items:center;gap:12px;overflow-x:auto;
+    box-shadow:0 2px 4px rgba(15,23,42,.02);position:sticky;top:72px;z-index:90;
+  }
+  body.mode-3 nav.mode-nav-tabs{top:110px}
+  .nav-tab-btn{
+    display:flex;align-items:center;gap:12px;padding:11px 20px;
+    border:1.5px solid var(--border-subtle);background:#fff;border-radius:var(--r-md);cursor:pointer;
+    font-family:var(--sans);font-weight:700;font-size:13.5px;color:var(--text-body);letter-spacing:.4px;
+    transition:all .2s ease;position:relative;white-space:nowrap;
+  }
+  .nav-tab-btn:hover{background:#f8fafc;border-color:var(--border-strong);color:var(--text-main);transform:translateY(-1px)}
+  .nav-tab-badge{font-family:var(--mono);font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px;background:#f1f5f9;color:var(--text-muted);border:1px solid rgba(0,0,0,.06)}
+  .nav-tab-btn[data-mode="1"].active{border-color:var(--a1);background:linear-gradient(to bottom,#fff,var(--a1l));color:var(--a1);box-shadow:0 4px 14px var(--a1g)}
+  .nav-tab-btn[data-mode="1"].active .nav-tab-badge{background:var(--a1);color:#fff}
+  .nav-tab-btn[data-mode="2"].active{border-color:var(--a2);background:linear-gradient(to bottom,#fff,var(--a2l));color:var(--a2);box-shadow:0 4px 14px var(--a2g)}
+  .nav-tab-btn[data-mode="2"].active .nav-tab-badge{background:var(--a2);color:#fff}
+  .nav-tab-btn[data-mode="3"].active{border-color:var(--a3);background:linear-gradient(to bottom,#fff,var(--a3l));color:var(--a3);box-shadow:0 4px 16px var(--a3g);animation:alertPulse 1.8s infinite}
+  .nav-tab-btn[data-mode="3"].active .nav-tab-badge{background:var(--a3);color:#fff}
+  .nav-tab-btn[data-mode="4"].active{border-color:var(--a4);background:linear-gradient(to bottom,#fff,var(--a4l));color:var(--a4);box-shadow:0 4px 14px var(--a4g)}
+  .nav-tab-btn[data-mode="4"].active .nav-tab-badge{background:var(--a4);color:#fff}
+  @keyframes alertPulse{0%,100%{box-shadow:0 0 10px var(--a3g)}50%{box-shadow:0 0 22px rgba(220,38,38,.55)}}
+
+  /* ============ main viewport ============ */
+  main.viewport-container{flex:1;padding:22px 26px 30px;display:flex;flex-direction:column}
+  .tab-section{display:none;flex-direction:column;gap:20px;opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease}
+  .tab-section.active{display:flex;opacity:1;transform:translateY(0)}
+  .card{background:var(--bg-card);border:1.5px solid var(--border-subtle);border-radius:var(--r-md);box-shadow:var(--shadow-sm);backdrop-filter:blur(10px)}
+  .card-header{padding:13px 20px;border-bottom:1.5px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:14px;background:rgba(248,250,252,.85);border-radius:var(--r-md) var(--r-md) 0 0;flex-wrap:wrap}
+  .card-title{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-main);display:flex;align-items:center;gap:10px}
+  .card-title-icon{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+  .card-tools{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:10.5px;color:var(--text-muted);letter-spacing:.3px;flex-wrap:wrap;text-align:right}
+
+  /* reticle corner frames */
+  .tactical-frame{position:relative}
+  .tactical-frame::before,.tactical-frame::after{content:'';position:absolute;width:14px;height:14px;pointer-events:none;z-index:2}
+  .tactical-frame::before{top:0;left:0;border-top:2.5px solid var(--border-dark);border-left:2.5px solid var(--border-dark)}
+  .tactical-frame::after{bottom:0;right:0;border-bottom:2.5px solid var(--border-dark);border-right:2.5px solid var(--border-dark)}
+
+  /* ============ legend ============ */
+  .legend{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 4px}
+  .chip{font-size:11px;padding:4px 11px;border-radius:12px;border:1.5px solid var(--c);color:var(--c);background:rgba(255,255,255,.75);font-weight:700;letter-spacing:.3px}
+  .chip.dash{border-style:dashed}
+  .legend-note{font-size:12px;line-height:1.5;color:var(--text-faint);margin:8px 0 4px;font-style:italic}
+
+  /* ============ executive briefing strip ============ */
+  .executive-briefing-strip{
+    background:#fff;border:1px solid var(--border-subtle);border-left:5px solid var(--ma,var(--a1));
+    border-radius:var(--r-md);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px;
+    box-shadow:var(--shadow-sm);flex-wrap:wrap;
+  }
+  .briefing-text{flex:1;min-width:280px}
+  .briefing-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-main);display:flex;align-items:center;gap:8px;margin-bottom:3px}
+  .briefing-desc{font-size:13px;color:var(--text-body);line-height:1.5}
+  .briefing-desc b{color:var(--text-main)}
+  .briefing-stats-pills{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;flex-wrap:wrap}
+  .stat-pill{background:#f8fafc;border:1px solid var(--border-subtle);padding:6px 12px;border-radius:4px;display:flex;flex-direction:column;align-items:flex-end;min-width:96px}
+  .stat-pill-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+  .stat-pill-val{font-size:13px;font-weight:800;color:var(--text-main)}
+
+  /* ============ pipeline activation view ============ */
+  .pipe-view{padding:18px 20px 20px}
+  .pipe-src{display:grid;grid-template-columns:1.9fr 1fr;gap:10px;margin-bottom:4px}
+  .pipe-srcbox{border:1px solid var(--border-strong);background:#f8fafc;border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:10.5px;color:var(--text-body);line-height:1.5}
+  .pipe-srcbox b{color:var(--text-main);letter-spacing:.5px}
+  .pipe-srcbox .always{color:var(--text-faint);font-weight:700}
+  .pgrid{display:grid;grid-template-columns:1fr 1.25fr 1.45fr 1fr;gap:10px;align-items:stretch}
+  .pgrid.wide{grid-template-columns:1fr}
+  .pdropgrid{display:grid;grid-template-columns:1fr 1.25fr 1.45fr 1fr;gap:10px;margin:3px 0}
+  .pdrop{text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-faint);padding:4px 2px;line-height:1.45}
+  .pdrop .ar{font-size:13px;display:block;letter-spacing:0}
+  .pdrop.dim{opacity:.28}
+  .pdrop.dim .ar{letter-spacing:4px;font-size:11px}
+  .pnode{border:1.5px solid var(--border-strong);border-radius:var(--r-md);background:#fff;padding:11px 12px 10px;position:relative;box-shadow:var(--shadow-sm)}
+  .pnode .ptag{font-family:var(--mono);font-size:9px;letter-spacing:.9px;color:var(--text-faint);text-transform:uppercase;font-weight:700}
+  .pnode .pname{font-size:12.5px;font-weight:800;color:var(--text-main);margin:2px 0 4px;line-height:1.3}
+  .pnode .psub{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.5}
+  .pnode .pstat{position:absolute;top:-9px;right:10px;font-family:var(--mono);font-size:9px;font-weight:800;padding:2px 8px;border-radius:9px;letter-spacing:.5px}
+  .pnode.on{border-color:var(--ma);background:linear-gradient(to bottom,#fff,var(--mal));box-shadow:0 3px 12px var(--mag)}
+  .pnode.on .pstat{background:var(--ma);color:#fff}
+  .pnode.off{opacity:.35;border-style:dashed}
+  .pnode.off .pstat{background:#e2e8f0;color:var(--text-muted)}
+  .pnode.ns{opacity:.6;border:1.5px dashed var(--gap);background:#fffafa}
+  .pnode.ns .pstat{background:#fff;color:var(--gap);border:1px dashed var(--gap)}
+  .pdots{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+  .pdot{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:10px;font-weight:800;border:1.5px solid var(--border-strong);color:var(--text-muted);background:#fff}
+  .pdot.gapst{border-style:dashed;border-color:var(--gap);color:var(--gap)}
+  .pdot.on{background:var(--ma);border-color:var(--ma);color:#fff;box-shadow:0 0 6px var(--mag)}
+  .pipe-cap{margin-top:12px;font-size:11.5px;color:var(--text-faint);line-height:1.5;font-style:italic}
+  .mchip{font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.5px;padding:2px 8px;border-radius:9px}
+  .mchip.on{background:var(--mal,var(--a1l));color:var(--ma,var(--a1));border:1px solid var(--ma,var(--a1b))}
+  .mchip.off{background:#f1f5f9;color:var(--text-faint);border:1px dashed var(--border-strong)}
+  .mchip.ns{background:#fffafa;color:var(--gap);border:1px dashed var(--gap)}
+
+  /* ============ algorithm chain strip ============ */
+  .chain-strip{display:flex;flex-wrap:wrap;gap:8px;padding:16px 20px}
+  .chip-step{border:1.5px solid var(--border-strong);background:#fff;border-radius:var(--r-md);padding:8px 12px 9px;font-family:var(--mono);font-size:10.5px;color:var(--text-body);min-width:118px;max-width:170px;line-height:1.45;position:relative}
+  .chip-step .csn{position:absolute;top:-9px;left:9px;background:var(--border-strong);color:#fff;font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 6px}
+  .chip-step b{display:block;font-size:11px;color:var(--text-main);letter-spacing:.3px;margin-top:2px}
+  .chip-step .cst{display:block;color:var(--text-muted);font-size:9.5px;margin-top:2px}
+  .chip-step .cst .warn{color:var(--gap);font-weight:700}
+  .chip-step.on{border-color:var(--ma);background:linear-gradient(to bottom,#fff,var(--mal));box-shadow:0 3px 10px var(--mag)}
+  .chip-step.on .csn{background:var(--ma)}
+  .chip-step.on b{color:var(--ma)}
+  .chip-step.dorm{opacity:.4;border-style:dashed}
+  .chip-step .dormtag{display:block;font-size:8.5px;letter-spacing:.6px;color:var(--text-faint);text-transform:uppercase;margin-top:3px}
+
+  /* ============ mode notes ============ */
+  .modenotes{list-style:none;padding:14px 20px 16px}
+  .modenotes li{font-size:12.5px;color:var(--text-body);line-height:1.65;padding-left:16px;position:relative;margin-top:5px}
+  .modenotes li::before{content:'▸';position:absolute;left:0;color:var(--ma,var(--a1));font-weight:900}
+  .modenotes li b{color:var(--text-main)}
+  .gapchip{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gap);border:1px dashed var(--gap);background:#fffafa;border-radius:9px;padding:1px 8px;letter-spacing:.4px}
+
+  /* ============ zones (preserved dossiers) ============ */
+  .zone{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:20px;margin-top:22px;box-shadow:var(--shadow-sm)}
+  .zone.ccpu-zone{border:2px solid var(--a1b);background:linear-gradient(to bottom,#fff,var(--a1l))}
+  .zone-head{font-size:12px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-faint);margin:2px 0 10px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .zone-head::before{content:'';width:9px;height:9px;border-radius:2px;background:var(--border-dark);flex-shrink:0}
+  .zone.ccpu-zone .zone-head{color:var(--a1)}
+  .zone.ccpu-zone .zone-head::before{background:var(--a1)}
+  .zone-head .note-inline{font-weight:400;text-transform:none;letter-spacing:.2px;color:var(--text-faint)}
+
+  /* blocks */
+  .block{background:#fff;border:1.5px solid var(--c,var(--border-strong));border-radius:var(--r-md);padding:15px 16px 13px;position:relative;box-shadow:var(--shadow-sm)}
+  .block .tag{position:absolute;top:-11px;left:12px;background:var(--c,var(--src));color:#fff;font-family:var(--mono);font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:var(--r-sm);letter-spacing:.8px}
+  .block h3{font-size:14.5px;line-height:1.35;color:var(--text-main);margin-bottom:7px;letter-spacing:.2px}
+  .block .meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px}
+  .badge{font-size:11px;line-height:1.4;padding:3px 9px;border-radius:var(--r-sm);background:#f1f5f9;border:1px solid var(--border-subtle);color:var(--text-muted);font-family:var(--mono)}
+  .badge.time{color:#fff;background:var(--c,var(--src));border:none;font-weight:800}
+  .badge.gap{color:var(--gap);border:1px dashed var(--gap);background:#fef2f2}
+  .block .io{font-size:12.5px;color:var(--text-body);line-height:1.65}
+  .block .io b{color:var(--text-main);font-weight:600}
+  .stn{--c:var(--stn)} .inb{--c:var(--od)} .seq{--c:var(--seq)} .gpu{--c:var(--gpu)}
+  .par{--c:var(--par)} .outb{--c:var(--out)} .mod{--c:var(--mod)} .ptp{--c:var(--ptp)} .extb{--c:var(--extb)}
+  .gapb{--c:var(--gap);border-style:dashed;background:#fffafa}
+
+  /* click-to-expand details */
+  .block.has-detail{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+  .block.has-detail:hover{border-color:var(--border-dark);box-shadow:var(--shadow-md)}
+  .block .detail{display:none;margin-top:9px;border-top:1px dashed var(--border-strong);padding-top:8px}
+  .block.open > .detail{display:block}
+  .hint{position:absolute;bottom:8px;right:12px;font-size:10px;color:var(--text-faint);letter-spacing:.4px;font-style:italic}
+  .drow{font-size:12.5px;color:var(--text-body);line-height:1.7;margin-top:5px}
+  .drow b{display:inline-block;min-width:84px;color:var(--text-main);font-family:var(--mono);font-size:11px;letter-spacing:.5px}
+
+  /* arrows / drops */
+  .drop{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;color:var(--text-faint);font-size:18px;padding:3px 0}
+  .drop span{font-size:11px;line-height:1.45;text-align:center;max-width:230px;color:var(--text-faint);margin-top:3px}
+  .dropcenter{display:flex;justify-content:center;padding:8px 0}
+
+  /* infrastructure grid */
+  .infra-grid{display:grid;grid-template-columns:1fr 1.9fr 1fr;gap:16px;align-items:start}
+  .vstack{display:flex;flex-direction:column;gap:10px}
+  .vstack .drop{align-self:center;padding:0}
+  .stn-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .drops{display:grid;gap:8px}
+  .drops.d3{grid-template-columns:1fr 1fr 1fr}
+  .drops.d4{grid-template-columns:1fr 1.25fr 1.45fr 1fr}
+  .infra-grid .block,.vstack .block,.cgrid .block,.egress .block,.stn-row .block{margin-top:8px}
+  .stn-row .block{margin-top:12px}
+
+  /* CCPU module grid */
+  .cgrid{display:grid;grid-template-columns:1fr 1.25fr 1.45fr 1fr;gap:10px;align-items:stretch}
+  .cgrid .drop{align-self:center;justify-self:center;padding:2px 0}
+
+  /* egress grid */
+  .egress{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;align-items:start}
+  .lane-head{font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint);margin:5px 0 9px}
+  .lane-head .c-out{color:var(--out)} .lane-head .c-ext{color:var(--extb)} .lane-head .c-par{color:var(--par)}
+
+  /* mini pipeline (inside Algorithm Processing Module) */
+  .mini{display:flex;flex-wrap:wrap;gap:5px 6px;align-items:center;margin:2px 0 5px}
+  .mini .step{border:1px solid var(--border-strong);background:#f8fafc;border-radius:6px;padding:5px 9px 6px;font-size:11px;line-height:1.45;color:var(--text-muted);max-width:195px;cursor:pointer;transition:background .12s,border-color .12s}
+  .mini .step:hover{background:#eef2f7}
+  .mini .step b{display:block;font-size:11.5px;color:var(--text-main)}
+  .mini .step .t{font-family:var(--mono);font-size:10.5px;color:var(--seq);font-weight:700}
+  .mini .step.gapst{border:1px dashed var(--gap);background:#fffafa}
+  .mini .step.gapst .t{color:var(--gap)}
+  .mini .step.sel{border:1.5px solid var(--seq);background:#fff7ed}
+  .mini .sep{color:var(--text-faint);font-size:12px}
+  .adetail{display:none;margin-top:9px;border:1.5px solid var(--border-subtle);border-left:4px solid var(--seq);border-radius:6px;background:#fffdf8;padding:6px 14px 10px}
+
+  /* full algorithm data-flow view */
+  .flowbtn{margin-top:10px;font-size:11.5px;font-weight:700;color:var(--seq);background:#fff7ed;border:1.5px solid var(--seq);border-radius:6px;padding:6px 14px;cursor:pointer;letter-spacing:.3px;font-family:var(--mono)}
+  .flowbtn:hover{background:#ffedd5}
+  .flowbtn.blue{color:var(--a1);background:var(--a1l);border-color:var(--a1)}
+  .flowbtn.blue:hover{background:#e0f2fe}
+  .algo-flow{margin-top:10px}
+  .fcard{border:1.5px solid var(--border-subtle);border-left:4px solid var(--fc,var(--seq));border-radius:6px;background:#fff;padding:11px 14px 12px}
+  .fcard.gapf{border-left-color:var(--gap);background:#fffafa}
+  .fhead{font-size:13px;font-weight:800;color:var(--text-main);margin-bottom:5px;padding-right:180px;line-height:1.4}
+  .fhead .fnum{display:inline-block;background:var(--fc,var(--seq));color:#fff;border-radius:6px;min-width:18px;padding:2px 6px;text-align:center;font-size:11px;margin-right:8px;vertical-align:1px;font-family:var(--mono)}
+  .fcard.gapf .fnum{background:var(--gap)}
+  .fhead .ftime{float:right;font-family:var(--mono);font-size:11px;color:var(--fc,var(--seq));font-weight:700;max-width:180px;text-align:right;line-height:1.5}
+  .fcard.gapf .ftime{color:var(--gap)}
+  .frow{font-size:12.5px;color:var(--text-body);line-height:1.7;margin-top:5px}
+  .frow b{display:inline-block;min-width:90px;color:var(--text-main);font-family:var(--mono);font-size:11px;letter-spacing:.5px}
+  .dest{display:inline-block;font-size:11px;border:1px solid var(--border-subtle);background:#f1f5f9;border-radius:10px;padding:2px 9px;margin:4px 5px 3px 0;color:var(--text-muted);font-family:var(--mono)}
+  .dest.hot{border-color:var(--seq);background:#fff7ed;color:var(--seq);font-weight:700}
+  .fnext{align-self:center;color:var(--text-faint);font-size:15px;padding:3px 0;display:flex;flex-direction:column;align-items:center}
+  .fnext span{font-size:10.5px;color:var(--text-faint);margin-top:2px}
+
+  /* mode comparison matrix */
+  .matrix-wrap{overflow-x:auto}
+  .matrix{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;background:#fff;border:1px solid var(--border-subtle);min-width:860px}
+  .matrix th{padding:10px 12px;text-align:center;border-bottom:1.5px solid var(--border-subtle);font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-main);background:#f8fafc}
+  .matrix th:first-child{text-align:left}
+  .matrix th.m1{color:var(--a1)} .matrix th.m2{color:var(--a2)} .matrix th.m3{color:var(--a3)} .matrix th.m4{color:var(--a4)}
+  .matrix td{padding:8px 12px;border-bottom:1px solid #f1f5f9;color:var(--text-body);text-align:center;vertical-align:middle;line-height:1.5}
+  .matrix td:first-child{text-align:left;font-size:11.5px;color:var(--text-main);font-weight:600}
+  .matrix tr.mgroup td{background:#f8fafc;color:var(--text-faint);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;font-weight:800;text-align:left;border-bottom:1px solid var(--border-subtle)}
+  .matrix .dor{color:var(--text-faint)}
+  .matrix .on1{color:var(--a1);font-weight:800}
+  .matrix .on2{color:var(--a2);font-weight:800}
+  .matrix .on3{color:var(--a3);font-weight:800}
+  .matrix .on4{color:var(--a4);font-weight:800}
+  .matrix .cont2{background:var(--a2l);color:var(--a2);font-weight:800}
+  .matrix .cont3{background:var(--a3l);color:var(--a3);font-weight:800}
+  .matrix .ns{color:var(--gap);font-weight:700}
+  .matrix-foot{margin-top:10px;font-size:11.5px;color:var(--text-faint);line-height:1.6}
+  .matrix-foot li{margin-left:18px;margin-top:3px}
+
+  /* HOW procedure — hidden by default, click card to open */
+  .how{display:none;margin:7px 0 3px 2px;border-left:2px solid #f2d8ae;background:#fffcf6;border-radius:0 6px 6px 0;padding:3px 12px 8px}
+  .fcard.howopen .how{display:block}
+  .fcard.has-how{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+  .fcard.has-how:hover{border-color:var(--border-dark);box-shadow:var(--shadow-md)}
+  .hhint{display:inline-block;margin-top:7px;font-size:10px;color:var(--text-faint);letter-spacing:.4px;font-style:italic}
+  .howl{font-size:11.5px;color:var(--text-body);line-height:1.7;margin-top:4px}
+  .howl b{color:var(--text-main)}
+  .fx{font-family:var(--mono);font-size:11px;background:#f1f5f9;border-radius:4px;padding:1px 5px;color:var(--text-main);white-space:nowrap}
+
+  /* dashed list boxes */
+  .listbox{border:1.5px dashed var(--border-strong);background:#fbfcfe;border-radius:var(--r-md);padding:13px 15px;align-self:start;margin-top:14px}
+  .listbox h4{font-size:11.5px;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px}
+  .listbox ul{list-style:none}
+  .listbox li{font-size:13px;color:var(--text-body);line-height:1.7}
+  .listbox li::before{content:'·';color:var(--mod);font-weight:900;margin-right:8px}
+
+  /* ============ source figures + reports ============ */
+  .srcfig{margin:16px 0 4px}
+  .srcfig img{display:block;width:100%;height:auto;max-height:84vh;object-fit:contain;background:#fff;border:1px solid var(--border-subtle);border-radius:var(--r-sm);margin:0 auto}
+  .srcfig figcaption{font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:8px;letter-spacing:.3px}
+  .srcfig + .card{margin-top:8px}
+  .srcfig + .card .card-header{background:rgba(248,250,252,.85)}
+
+  /* timing */
+  .timing{margin-top:22px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:17px 20px;box-shadow:var(--shadow-sm)}
+  .timing h2{font-size:13px;letter-spacing:1.2px;color:var(--text-faint);text-transform:uppercase;margin-bottom:11px}
+  .timing table{width:100%;border-collapse:collapse;font-size:13px}
+  .timing td{padding:7px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;color:var(--text-body);line-height:1.55}
+  .timing td:last-child{font-family:var(--mono);white-space:nowrap;text-align:right;color:var(--text-main)}
+  .warn{color:var(--gap);font-weight:700}
+  .ok{color:var(--mod);font-weight:700}
+  .note{font-size:12px;color:var(--text-faint);margin-top:10px;line-height:1.6}
+  .note b{color:var(--text-main)}
+
+  body.hidetiming .timing{display:none}
+  body.hidetiming .badge.time{display:none}
+
+  @media (max-width:1100px){
+    .infra-grid,.cgrid,.pgrid,.pdropgrid,.egress,.stn-row{grid-template-columns:1fr 1fr}
+    .pipe-src{grid-template-columns:1fr}
+    .drops.d3,.drops.d4{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:720px){
+    .infra-grid,.cgrid,.pgrid,.pdropgrid,.egress,.stn-row{grid-template-columns:1fr}
+    .drops.d3,.drops.d4{grid-template-columns:1fr}
+    nav.mode-nav-tabs{top:auto;position:static}
+  }
+  @media print{
+    header.tactical-header,nav.mode-nav-tabs,.hazard-banner,.header-controls,.btn{display:none!important}
+    body{background:#fff!important}
+    .tab-section{display:flex!important;opacity:1!important;transform:none!important;break-inside:avoid}
+    .card,.zone{box-shadow:none!important;border:1px solid #94a3b8!important}
+    .fcard .how{display:block!important}
+    .fcard .hhint{display:none!important}
+  }
+
+</style>
+</head>
+<body class="hidetiming mode-1">
+
+  <!-- Mode 03 hazard banner (alert indication, per mode spec) -->
+  <div class="hazard-banner" id="hazardBanner">⚠ MODE 03 — TARGET LOCK / MISSILE DETECT / ALERT · FULL 8-STEP CHAIN EVERY FRAME · ALERT PROPAGATED · HIGH-RATE CUE ⚠</div>
+
+  <!-- Sticky header -->
+  <header class="tactical-header">
+    <div class="brand-group">
+      <div class="brand-logo-mark"></div>
+      <div class="brand-title">
+        <h1>CCPU — Mode-Based Algorithm Flow <span class="brand-badge">OSS · CCPU</span></h1>
+      </div>
+    </div>
+    <div class="header-controls">
+      <button class="btn" id="timingBtn" type="button">▸ show timing values (doc-stated worst case — actual HW latency unverified)</button>
+    </div>
+  </header>
+
+  <!-- Mode tab bar -->
+  <nav class="mode-nav-tabs">
+    <button class="nav-tab-btn active" data-mode="1" type="button"><span class="nav-tab-badge">01</span><span>SCAN / SURVEILLANCE</span></button>
+    <button class="nav-tab-btn" data-mode="2" type="button"><span class="nav-tab-badge">02</span><span>TARGET DETECT</span></button>
+    <button class="nav-tab-btn" data-mode="3" type="button"><span class="nav-tab-badge">03</span><span>LOCK / MISSILE / ALERT</span></button>
+    <button class="nav-tab-btn" data-mode="4" type="button"><span class="nav-tab-badge">04</span><span>MANUAL OPERATION</span></button>
+  </nav>
+
+  <main class="viewport-container">
+
+    <!-- ================================================================
+         MODE 01 — SCAN / SURVEILLANCE
+         ================================================================ -->
+    <section class="tab-section active" id="mode-1" style="--ma:var(--a1);--mal:var(--a1l);--mag:var(--a1g)">
+      <div class="executive-briefing-strip">
+        <div class="briefing-text">
+          <div class="briefing-title"><span style="color:var(--a1)">●</span> MODE 01 — SCAN / SURVEILLANCE · NOMINAL STATE</div>
+          <div class="briefing-desc">Stations run autonomous search/scan; no confirmed track. CCPU's job in this mode is <b>DISPLAY-ONLY</b> on station-based (side-based) video: it composites overlays and symbology (view labels, status, crosshair, time/UTC) onto the station vision and feeds the video wall. The entire 8-step algorithm chain is dormant — no association, no ranging, no cueing.</div>
+        </div>
+        <div class="briefing-stats-pills">
+          <div class="stat-pill"><span class="stat-pill-label">Modules Active (CCPU)</span><span class="stat-pill-val" style="color:var(--a1)">6</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Chain Depth</span><span class="stat-pill-val">0 / 8</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Cue Mode</span><span class="stat-pill-val">IDLE</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Algorithm Steps</span><span class="stat-pill-val">0 OF 8</span></div>
+        </div>
+      </div>
+
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a1)"></span> PIPELINE ACTIVATION — MODE 01</div>
+          <div class="card-tools"><span class="mchip on" style="--ma:var(--a1);--mal:var(--a1l)">● ACTIVE</span><span class="mchip off">◌ DORMANT</span><span class="mchip ns">⚠ NOT STATED</span></div>
+        </div>
+        <div class="pipe-view" id="pipe-1"></div>
+      </div>
+
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a1)"></span> ALGORITHM CHAIN STRIP — 8 STEPS · 0 LIVE IN THIS MODE</div>
+          <div class="card-tools">FRAME DISCIPLINE — Nth: detection at station (SPU GPU CUDA, parallel) · (N-1)th: chain at CCPU (CPU, sequential) · deliberate 1-frame design (pipeline p1 note)</div>
+        </div>
+        <div class="chain-strip">
+          <div class="chip-step dorm"><span class="csn">1</span><b>ASSOCIATION</b><span class="cst"><span class="warn">FR-PERF-014 · ⚠ NOT BUDGETED</span></span><span class="dormtag">dormant in this mode</span></div>
+          <div class="chip-step dorm"><span class="csn">2</span><b>KINEMATIC DERIVATION</b><span class="cst">~3 ms</span><span class="dormtag">dormant in this mode</span></div>
+          <div class="chip-step dorm"><span class="csn">3</span><b>PASSIVE RANGING</b><span class="cst">~2 ms · NFR-ACC-02 ≤2%</span><span class="dormtag">dormant in this mode</span></div>
+          <div class="chip-step dorm"><span class="csn">4</span><b>TRAJECTORY ESTIMATION</b><span class="cst">~3 ms · FR-CCPU-102</span><span class="dormtag">dormant in this mode</span></div>
+          <div class="chip-step dorm"><span class="csn">5</span><b>REENTRY POINT CALC</b><span class="cst">~2 ms · NFR-ACC-03 ±1 km CEP</span><span class="dormtag">dormant in this mode</span></div>
+          <div class="chip-step dorm"><span class="csn">6</span><b>LAUNCH &amp; IMPACT POINT</b><span class="cst"><span class="warn">FR-PERF-016 · ⚠ NO TIMING ROW</span></span><span class="dormtag">dormant in this mode</span></div>
+          <div class="chip-step dorm"><span class="csn">7</span><b>CUE GENERATION</b><span class="cst">~3 ms · stream 0x05 · port 5005</span><span class="dormtag">dormant in this mode</span></div>
+          <div class="chip-step dorm"><span class="csn">8</span><b>TARGET CLASSIFICATION</b><span class="cst"><span class="warn">⚠ TIME NOT STATED</span></span><span class="dormtag">dormant in this mode</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="card-title-icon" style="background:var(--a1)"></span> MODE NOTES — 01 · SCAN / SURVEILLANCE</div></div>
+        <ul class="modenotes">
+          <li><b>Symbology set (per mode spec):</b> view labels · status · crosshair · time/UTC — composited onto station vision on the wall.</li>
+          <li><b>Tracklist ingress</b> may be received but is <b>not processed</b> (per mode spec) — Data Stream Processing and the 8-step chain are dormant.</li>
+          <li><b>Station detection continues at the STNs</b> — frame N, SPU GPU CUDA point/image detection (~3 ms, parallel to the (N-1) chain); tracklist + video + telemetry uplinks unaffected.</li>
+          <li><b>Not stated for this mode</b> <span class="gapchip">⚠ GAP</span> — Data Management (video-frame logging) · Control &amp; Management (base console config/calib) — see matrix footnotes.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         MODE 02 — TARGET DETECT
+         ================================================================ -->
+    <section class="tab-section" id="mode-2" style="--ma:var(--a2);--mal:var(--a2l);--mag:var(--a2g)">
+      <div class="executive-briefing-strip">
+        <div class="briefing-text">
+          <div class="briefing-title"><span style="color:var(--a2)">●</span> MODE 02 — TARGET DETECT</div>
+          <div class="briefing-desc">Station SPU has detected; SPU + MPU deliver the tracklist (<b>Payload 1 · port 5010</b>) to CCPU. CCPU validates and runs the <b>PARTIAL algorithm chain (5 of 8 steps)</b>: Association → Kinematic → Ranging → Trajectory → Cue. Its primary work in this mode is <b>CUE generation and continuous targeting</b> — holding the station reticle on the track (sustained closed-loop track maintenance). Reentry, Launch &amp; Impact, and Classification stay dormant (locked/missile state).</div>
+        </div>
+        <div class="briefing-stats-pills">
+          <div class="stat-pill"><span class="stat-pill-label">Modules Active (CCPU)</span><span class="stat-pill-val" style="color:var(--a2)">9</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Chain Depth</span><span class="stat-pill-val">5 / 8</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Cue Mode</span><span class="stat-pill-val" style="color:var(--a2)">CONTINUOUS (RE-CUE)</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Algorithm Steps</span><span class="stat-pill-val">5 OF 8</span></div>
+        </div>
+      </div>
+
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a2)"></span> PIPELINE ACTIVATION — MODE 02</div>
+          <div class="card-tools"><span class="mchip on" style="--ma:var(--a2);--mal:var(--a2l)">● ACTIVE</span><span class="mchip off">◌ DORMANT</span><span class="mchip ns">⚠ NOT STATED</span></div>
+        </div>
+        <div class="pipe-view" id="pipe-2"></div>
+      </div>
+
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a2)"></span> ALGORITHM CHAIN STRIP — 8 STEPS · 5 LIVE IN THIS MODE (1-4 + 7)</div>
+          <div class="card-tools">FRAME DISCIPLINE — Nth: detection at station (SPU GPU CUDA, parallel) · (N-1)th: chain at CCPU (CPU, sequential) · deliberate 1-frame design (pipeline p1 note)</div>
+        </div>
+        <div class="chain-strip">
+          <div class="chip-step on"><span class="csn">1</span><b>ASSOCIATION</b><span class="cst"><span class="warn">FR-PERF-014 · ⚠ NOT BUDGETED</span></span></div>
+          <div class="chip-step on"><span class="csn">2</span><b>KINEMATIC DERIVATION</b><span class="cst">~3 ms</span></div>
+          <div class="chip-step on"><span class="csn">3</span><b>PASSIVE RANGING</b><span class="cst">~2 ms · NFR-ACC-02 ≤2%</span></div>
+          <div class="chip-step on"><span class="csn">4</span><b>TRAJECTORY ESTIMATION</b><span class="cst">~3 ms · FR-CCPU-102</span></div>
+          <div class="chip-step dorm"><span class="csn">5</span><b>REENTRY POINT CALC</b><span class="cst">~2 ms · NFR-ACC-03 ±1 km CEP</span><span class="dormtag">dormant — locked/missile state</span></div>
+          <div class="chip-step dorm"><span class="csn">6</span><b>LAUNCH &amp; IMPACT POINT</b><span class="cst"><span class="warn">FR-PERF-016 · ⚠ NO TIMING ROW</span></span><span class="dormtag">dormant — locked/missile state</span></div>
+          <div class="chip-step on"><span class="csn">7</span><b>CUE GENERATION</b><span class="cst">~3 ms · stream 0x05 · port 5005</span><span class="cst" style="color:var(--a2);font-weight:700">CONTINUOUS RE-CUE</span></div>
+          <div class="chip-step dorm"><span class="csn">8</span><b>TARGET CLASSIFICATION</b><span class="cst"><span class="warn">⚠ TIME NOT STATED</span></span><span class="dormtag">dormant — locked/missile state</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="card-title-icon" style="background:var(--a2)"></span> MODE NOTES — 02 · TARGET DETECT</div></div>
+        <ul class="modenotes">
+          <li><b>Tracklist ingress (per mode spec):</b> SPU + MPU deliver Payload 1 (port 5010 · VLAN35 · PCP4 · 0xAA/0xDC frames · STN ID 0x02/0x03/0x04).</li>
+          <li><b>Primary CCPU work (per mode spec):</b> CUE ("queue") generation and continuous targeting — sustained closed-loop track maintenance: the station reticle is held on the track with continuous re-cueing as trajectory updates.</li>
+          <li><b>Dormant (per mode spec — belong to the locked/missile state):</b> Reentry Point Calculation · Launch &amp; Impact Point Derivation · Target Classification.</li>
+          <li><b>Video (per mode spec):</b> track-box / target symbology added to the relevant station feed on the wall.</li>
+          <li><b>Not stated for this mode</b> <span class="gapchip">⚠ GAP</span> — Data Management (chain-output logging). Cue egress via Control &amp; Management per original data flow.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         MODE 03 — TARGET LOCK / MISSILE DETECT / ALERT
+         ================================================================ -->
+    <section class="tab-section" id="mode-3" style="--ma:var(--a3);--mal:var(--a3l);--mag:var(--a3g)">
+      <div class="executive-briefing-strip">
+        <div class="briefing-text">
+          <div class="briefing-title"><span style="color:var(--a3)">●</span> MODE 03 — TARGET LOCK / MISSILE DETECT / ALERT · HIGHEST ACTIVITY</div>
+          <div class="briefing-desc">Target locked, or missile detected, or alert condition. The <b>FULL 8-step algorithm chain runs every frame</b>: Association → Kinematic → Ranging → Trajectory → Reentry → Launch &amp; Impact → Cue (now high-rate continuous, not event-only) → Target Classification. Additional behavior (per mode spec): <b>alert propagation</b> — urgent/colored symbology state, alert indication in the header, event logging to Data Management.</div>
+        </div>
+        <div class="briefing-stats-pills">
+          <div class="stat-pill"><span class="stat-pill-label">Modules Active (CCPU)</span><span class="stat-pill-val" style="color:var(--a3)">10</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Chain Depth</span><span class="stat-pill-val">8 / 8</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Cue Mode</span><span class="stat-pill-val" style="color:var(--a3)">HIGH-RATE CONTINUOUS</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Algorithm Steps</span><span class="stat-pill-val">8 OF 8 · EVERY FRAME</span></div>
+        </div>
+      </div>
+
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a3)"></span> PIPELINE ACTIVATION — MODE 03</div>
+          <div class="card-tools"><span class="mchip on" style="--ma:var(--a3);--mal:var(--a3l)">● ACTIVE</span><span class="mchip off">◌ DORMANT</span><span class="mchip ns">⚠ NOT STATED</span></div>
+        </div>
+        <div class="pipe-view" id="pipe-3"></div>
+      </div>
+
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a3)"></span> ALGORITHM CHAIN STRIP — 8 STEPS · ALL 8 LIVE IN THIS MODE</div>
+          <div class="card-tools">FRAME DISCIPLINE — Nth: detection at station (SPU GPU CUDA, parallel) · (N-1)th: chain at CCPU (CPU, sequential) · deliberate 1-frame design (pipeline p1 note)</div>
+        </div>
+        <div class="chain-strip">
+          <div class="chip-step on"><span class="csn">1</span><b>ASSOCIATION</b><span class="cst"><span class="warn">FR-PERF-014 · ⚠ NOT BUDGETED</span></span></div>
+          <div class="chip-step on"><span class="csn">2</span><b>KINEMATIC DERIVATION</b><span class="cst">~3 ms</span></div>
+          <div class="chip-step on"><span class="csn">3</span><b>PASSIVE RANGING</b><span class="cst">~2 ms · NFR-ACC-02 ≤2%</span></div>
+          <div class="chip-step on"><span class="csn">4</span><b>TRAJECTORY ESTIMATION</b><span class="cst">~3 ms · FR-CCPU-102</span></div>
+          <div class="chip-step on"><span class="csn">5</span><b>REENTRY POINT CALC</b><span class="cst">~2 ms · NFR-ACC-03 ±1 km CEP</span></div>
+          <div class="chip-step on"><span class="csn">6</span><b>LAUNCH &amp; IMPACT POINT</b><span class="cst"><span class="warn">FR-PERF-016 · ⚠ NO TIMING ROW</span></span></div>
+          <div class="chip-step on"><span class="csn">7</span><b>CUE GENERATION</b><span class="cst">~3 ms · stream 0x05 · port 5005</span><span class="cst" style="color:var(--a3);font-weight:700">HIGH-RATE CONTINUOUS (NOT EVENT-ONLY)</span></div>
+          <div class="chip-step on"><span class="csn">8</span><b>TARGET CLASSIFICATION</b><span class="cst"><span class="warn">⚠ TIME NOT STATED</span></span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="card-title-icon" style="background:var(--a3)"></span> MODE NOTES — 03 · TARGET LOCK / MISSILE DETECT / ALERT</div></div>
+        <ul class="modenotes">
+          <li><b>Full 8-step chain every frame (per mode spec)</b> — the highest-activity mode; steps 5-6 (Reentry · Launch &amp; Impact) and step 8 (Classification) are live only in this state.</li>
+          <li><b>Cue: high-rate continuous, not event-only (per mode spec).</b> The original pipeline doc describes Cue Generation as on-demand / event (FR-PERF-013 boost · FR-PERF-017 reentry) — the per-mode re-cue behavior is per the mode spec, not the pipeline doc <span class="gapchip">⚠ GAP</span>.</li>
+          <li><b>Alert propagation (per mode spec):</b> urgent/colored symbology state on the wall · alert indication via the sticky hazard banner (shown when this tab is active) · event logging to Data Management.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         MODE 04 — MANUAL OPERATION
+         ================================================================ -->
+    <section class="tab-section" id="mode-4" style="--ma:var(--a4);--mal:var(--a4l);--mag:var(--a4g)">
+      <div class="executive-briefing-strip">
+        <div class="briefing-text">
+          <div class="briefing-title"><span style="color:var(--a4)">●</span> MODE 04 — MANUAL OPERATION (CCPU-DRIVEN STATION SEARCH &amp; SCAN)</div>
+          <div class="briefing-desc">Operator takes control from the console via CCPU. Active path (per mode spec): Operator Console (<b>Payload 2 — streams 0x08 Override / 0x09 Manual</b>) → Control &amp; Management Module (<b>ALL commands pass through CCPU, no bypass</b>) → C&amp;C route (L3 Switch) → station MPU → SPU → Gimbal (<b>RS422 · 921 kbps · 10 ms cycle</b>). CCPU commands the station to SEARCH AND SCAN; station vision is displayed on the video wall. The autonomous algorithm chain is dormant — <b>the operator is the targeting brain</b>.</div>
+        </div>
+        <div class="briefing-stats-pills">
+          <div class="stat-pill"><span class="stat-pill-label">Modules Active (CCPU)</span><span class="stat-pill-val" style="color:var(--a4)">6</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Chain Depth</span><span class="stat-pill-val">0 / 8</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Cue Mode</span><span class="stat-pill-val" style="color:var(--a4)">OPERATOR (0x08 / 0x09)</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Gimbal Command Cycle</span><span class="stat-pill-val">10 ms · RS422 921 kbps</span></div>
+        </div>
+      </div>
+
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a4)"></span> PIPELINE ACTIVATION — MODE 04</div>
+          <div class="card-tools"><span class="mchip on" style="--ma:var(--a4);--mal:var(--a4l)">● ACTIVE</span><span class="mchip off">◌ DORMANT</span><span class="mchip ns">⚠ NOT STATED</span></div>
+        </div>
+        <div class="pipe-view" id="pipe-4"></div>
+      </div>
+
+      <div class="card tactical-frame">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a4)"></span> ALGORITHM CHAIN STRIP — 8 STEPS · 0 LIVE IN THIS MODE</div>
+          <div class="card-tools">FRAME DISCIPLINE — Nth: detection at station (SPU GPU CUDA, parallel) · (N-1)th: chain at CCPU (CPU, sequential) · deliberate 1-frame design (pipeline p1 note)</div>
+        </div>
+        <div class="chain-strip">
+          <div class="chip-step dorm"><span class="csn">1</span><b>ASSOCIATION</b><span class="cst"><span class="warn">FR-PERF-014 · ⚠ NOT BUDGETED</span></span><span class="dormtag">dormant — operator is the targeting brain</span></div>
+          <div class="chip-step dorm"><span class="csn">2</span><b>KINEMATIC DERIVATION</b><span class="cst">~3 ms</span><span class="dormtag">dormant — operator is the targeting brain</span></div>
+          <div class="chip-step dorm"><span class="csn">3</span><b>PASSIVE RANGING</b><span class="cst">~2 ms · NFR-ACC-02 ≤2%</span><span class="dormtag">dormant — operator is the targeting brain</span></div>
+          <div class="chip-step dorm"><span class="csn">4</span><b>TRAJECTORY ESTIMATION</b><span class="cst">~3 ms · FR-CCPU-102</span><span class="dormtag">dormant — operator is the targeting brain</span></div>
+          <div class="chip-step dorm"><span class="csn">5</span><b>REENTRY POINT CALC</b><span class="cst">~2 ms · NFR-ACC-03 ±1 km CEP</span><span class="dormtag">dormant — operator is the targeting brain</span></div>
+          <div class="chip-step dorm"><span class="csn">6</span><b>LAUNCH &amp; IMPACT POINT</b><span class="cst"><span class="warn">FR-PERF-016 · ⚠ NO TIMING ROW</span></span><span class="dormtag">dormant — operator is the targeting brain</span></div>
+          <div class="chip-step dorm"><span class="csn">7</span><b>CUE GENERATION</b><span class="cst">~3 ms · stream 0x05 · port 5005</span><span class="dormtag">dormant — manual commands via C&amp;M instead</span></div>
+          <div class="chip-step dorm"><span class="csn">8</span><b>TARGET CLASSIFICATION</b><span class="cst"><span class="warn">⚠ TIME NOT STATED</span></span><span class="dormtag">dormant — operator is the targeting brain</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="card-title-icon" style="background:var(--a4)"></span> MODE NOTES — 04 · MANUAL OPERATION</div></div>
+        <ul class="modenotes">
+          <li><b>All station commands pass through CCPU — no bypass</b> (per mode spec; matches the Operator Console doc: in Override/Manual mode all commands route through the C&amp;M Module).</li>
+          <li><b>Console streams in use (per mode spec):</b> Payload 2 — 0x08 Override / 0x09 Manual.</li>
+          <li><b>Station path (per mode spec):</b> C&amp;M → C&amp;C route (L3 Switch) → station MPU → SPU → Gimbal (RS422 · 921 kbps · 10 ms cycle) — CCPU commands the station to SEARCH AND SCAN; station vision displayed on the video wall.</li>
+          <li><b>Not stated for this mode</b> <span class="gapchip">⚠ GAP</span> — Symbology &amp; Overlay set on the wall (mode spec names video display only).</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         MODE COMPARISON MATRIX
+         ================================================================ -->
+    <div class="zone">
+      <div class="matrix-wrap">
+        <table class="matrix">
+          <tr>
+            <th style="min-width:290px">Path / Algorithm Step</th>
+            <th class="m1">Mode 01<br>Scan / Surv</th>
+            <th class="m2">Mode 02<br>Detect</th>
+            <th class="m3">Mode 03<br>Lock / Alert</th>
+            <th class="m4">Mode 04<br>Manual</th>
+          </tr>
+          <tr class="mgroup"><td colspan="5">8-step algorithm chain — CPU · (N-1)th · sequential</td></tr>
+          <tr><td>1 · Association <span style="color:var(--gap);font-weight:700">⚠</span> (FR-PERF-014)</td><td class="dor">DORMANT</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="dor">DORMANT</td></tr>
+          <tr><td>2 · Kinematic Derivation (~3 ms)</td><td class="dor">DORMANT</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="dor">DORMANT</td></tr>
+          <tr><td>3 · Passive Ranging (~2 ms · NFR-ACC-02)</td><td class="dor">DORMANT</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="dor">DORMANT</td></tr>
+          <tr><td>4 · Trajectory Estimation (~3 ms · FR-CCPU-102)</td><td class="dor">DORMANT</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="dor">DORMANT</td></tr>
+          <tr><td>5 · Reentry Point Calculation (~2 ms · NFR-ACC-03)</td><td class="dor">DORMANT</td><td class="dor">DORMANT</td><td class="on3">ACTIVE</td><td class="dor">DORMANT</td></tr>
+          <tr><td>6 · Launch &amp; Impact Point Derivation <span style="color:var(--gap);font-weight:700">⚠</span> (FR-PERF-016)</td><td class="dor">DORMANT</td><td class="dor">DORMANT</td><td class="on3">ACTIVE</td><td class="dor">DORMANT</td></tr>
+          <tr><td>7 · Cue Generation (~3 ms · stream 0x05 · port 5005)</td><td class="dor">DORMANT</td><td class="cont2">CONTINUOUS (RE-CUE)</td><td class="cont3">CONTINUOUS (HIGH-RATE)</td><td class="dor">DORMANT</td></tr>
+          <tr><td>8 · Target Classification <span style="color:var(--gap);font-weight:700">⚠</span> (no timing/FR row)</td><td class="dor">DORMANT</td><td class="dor">DORMANT</td><td class="on3">ACTIVE</td><td class="dor">DORMANT</td></tr>
+          <tr class="mgroup"><td colspan="5">Display / data / control paths</td></tr>
+          <tr><td>IP Stream Selection (ingress demux · port 5020)</td><td class="on1">ACTIVE</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="on4">ACTIVE</td></tr>
+          <tr><td>Video Acquisition — NVDEC (Nth · parallel · ~7 ms)</td><td class="on1">ACTIVE</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="on4">ACTIVE</td></tr>
+          <tr><td>SMPTE 2110 Gateway (decode bypass · 0x03/0x04)</td><td class="on1">ACTIVE</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="on4">ACTIVE</td></tr>
+          <tr><td>Symbology &amp; Overlay Generation (~2 ms · FR-CCPU-201)</td><td class="on1">ACTIVE (BASE)</td><td class="on2">ACTIVE (TRACK BOX)</td><td class="on3">ACTIVE (ALERT STATE)</td><td class="ns">⚠ NOT STATED</td></tr>
+          <tr><td>Data Stream Processing (validate · ≤1.25 ms window)</td><td class="dor">DORMANT</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="dor">DORMANT</td></tr>
+          <tr><td>Timesync Module (PTP · &lt;100 ns · continuous lock)</td><td class="on1">ACTIVE</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="on4">ACTIVE</td></tr>
+          <tr><td>Data Management (logging · ~2 ms · FR-PERF-018)</td><td class="ns">⚠ NOT STATED</td><td class="ns">⚠ NOT STATED</td><td class="on3">ACTIVE (EVENT LOG)</td><td class="ns">⚠ NOT STATED</td></tr>
+          <tr><td>Control &amp; Management Module (I-SW-003)</td><td class="ns">⚠ NOT STATED</td><td class="on2">ACTIVE (CUE EGRESS)</td><td class="on3">ACTIVE (ALERT + CUE)</td><td class="on4">ACTIVE (ALL COMMANDS)</td></tr>
+          <tr><td>C&amp;C route → Gimbal (RS422 · 921 kbps · 10 ms cycle)</td><td class="dor">DORMANT</td><td class="on2">ACTIVE (RE-CUE)</td><td class="on3">ACTIVE (HIGH-RATE)</td><td class="on4">ACTIVE (SEARCH / SCAN)</td></tr>
+          <tr><td>Video Wall (VWC + 2110 bypass · HDMI)</td><td class="on1">ACTIVE</td><td class="on2">ACTIVE</td><td class="on3">ACTIVE</td><td class="on4">ACTIVE</td></tr>
+        </table>
+      </div>
+      <div class="matrix-foot">
+        Footnotes:
+        <ul>
+          <li><b>⚠ NOT STATED</b> = the mode spec neither activates nor marks that module dormant in that mode. The original data flow routes decoded video frames to Data Management (logging path) and console config/calibration commands to C&amp;M in all modes — the mode spec is silent on those per-mode states.</li>
+          <li><b>Cue (step 7):</b> Modes 2-3 continuous per the mode spec. The original pipeline doc describes Cue Generation as on-demand / event, not per-frame (FR-PERF-013 boost · FR-PERF-017 reentry) — the per-mode re-cue behavior comes from the mode spec, not the pipeline doc <span class="gapchip">⚠ GAP</span>.</li>
+          <li><b>Chain rows:</b> Mode 02 lights steps 1-4 + 7 (partial chain, per mode spec) · Mode 03 all 8 every frame · Modes 01 &amp; 04 none. Frame discipline unchanged: detection on the Nth frame at the stations (parallel, GPU CUDA), chain on (N-1) at CCPU (sequential, CPU).</li>
+          <li><b>Timesync</b> shown ACTIVE in all modes per the original data flow ("continuous PTP lock, same as OS") — mode spec silent.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         EXTERNAL INFRASTRUCTURE (preserved)
+         ================================================================ -->
+    <div class="zone">
+      <div class="zone-head">External — stations · TSN network · consumers <span class="note-inline">(outside CCPU, per CCPU_Data_Flow.png) — mode-independent base infrastructure</span></div>
+      <div class="infra-grid">
+
+        <!-- left column: consoles / GIS -->
+        <div class="vstack">
+          <div class="block extb has-detail">
+            <span class="tag">EXTERNAL</span>
+            <h3>Peripherals</h3>
+            <div class="meta"><span class="badge">RS422</span></div>
+            <div class="io">To Operator Console (RS422).</div>
+            <div class="detail">
+              <div class="drow"><b>ROLE</b>Operator hardware control surface — joystick, switches, serial devices</div>
+              <div class="drow"><b>FLOW</b>Physical I/O → RS422 serial → Operator Console</div>
+              <div class="drow"><b>NOTE</b>Console converts peripheral input into Payload 2 IP streams (see Operator Console detail)</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="drop">▼<span>RS422</span></div>
+          <div class="block extb has-detail">
+            <span class="tag">EXTERNAL · CONSOLE</span>
+            <h3>Operator Console</h3>
+            <div class="meta"><span class="badge">RS422 / USB / KVM</span><span class="badge">Payload 2</span><span class="badge">HW 0x02-0x04</span><span class="badge">HDMI</span></div>
+            <div class="io">Streams: 0x02 Config · 0x06 Calib · 0x08 Override · 0x09 MANUAL — in Override/Manual mode all commands pass through CCPU. Receives <b>Processed Data, Ctrl Msg, Comp. Videos (10G)</b> from L3 Switch + HDMI display from Video Wall Controller.</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b> Operator input via RS422 / USB / KVM · Payload 2 (HW 0x02-0x04)</div>
+              <div class="drow"><b>MODES</b> 0x02 Config · 0x06 Calib · 0x08 Override · 0x09 MANUAL — Override/Manual: all commands route through CCPU C&amp;M Module</div>
+              <div class="drow"><b>DISPLAY</b> Processed Data, Ctrl Msg, Comp. Videos (10G) from L3 Switch + HDMI from Video Wall Controller</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="drop">▼<span>Processed Data, Ctrl Msg, Comp. Videos (10G)</span></div>
+          <div class="block extb has-detail">
+            <span class="tag">EXTERNAL</span>
+            <h3>GIS Data Interface</h3>
+            <div class="meta"><span class="badge">HDMI</span><span class="badge">10G</span></div>
+            <div class="io">From L3 Switch (10G) + HDMI from Video Wall Controller; <b>Processed Sensor Data (10G)</b> → Data Storage.</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>Processed Data, Ctrl Msg, Comp. Videos (10G) from L3 Switch + HDMI from Video Wall Controller</div>
+              <div class="drow"><b>PROCESS</b>Packages track/target data for geospatial (GIS) display &amp; analysis</div>
+              <div class="drow"><b>OUT</b>Processed Sensor Data (10G) → Data Storage (GIS side)</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="drop">▼<span>Processed Sensor Data (10G)</span></div>
+          <div class="block par has-detail">
+            <span class="tag">STORAGE</span>
+            <h3>Data Storage (GIS side)</h3>
+            <div class="io">Processed Sensor Data (10G) from GIS Data Interface.</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>Processed Sensor Data (10G) from GIS Data Interface</div>
+              <div class="drow"><b>ROLE</b>GIS-side archive — separate from the CCPU short &amp; long-term storage</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+        </div>
+
+        <!-- center column: STNs + L3 switch -->
+        <div class="vstack">
+          <div class="stn-row">
+            <div class="block stn has-detail">
+              <span class="tag">STN 1 · 2×10G</span>
+              <h3>Sensor Station 1</h3>
+              <div class="meta"><span class="badge">STN ID 0x02</span><span class="badge">SPU → MPU</span><span class="badge time">SPU detect GPU CUDA ~3 ms (Nth)</span></div>
+              <div class="io">Point/image detection on sensor video — <b>performs at the station</b>; uplink: tracklist + video + telemetry.</div>
+              <div class="detail">
+                <div class="drow"><b>IN</b>Sensor video (optical / IR) at the station</div>
+                <div class="drow"><b>PROCESS</b>SPU target detection — GPU CUDA point/image detection on frame N (parallel to the CCPU (N-1) chain)</div>
+                <div class="drow"><b>OUT</b>Local tracklist (Payload 1) + video (SRT comp · 2110 uncomp) + Az/El telemetry (stream 0x03) via MPU</div>
+                <div class="drow"><b>LINK</b>2×10G uplink to L3 Switch — every tracklist frame carries STN ID <b>0x02</b></div>
+                <div class="drow"><b>NOTE</b>Detection runs at the station; CCPU receives the resulting tracklist and does the fusion/tracking chain</div>
+              </div>
+              <span class="hint">▸ click for detail</span>
+            </div>
+            <div class="block stn has-detail">
+              <span class="tag">STN 2 · 2×10G</span>
+              <h3>Sensor Station 2</h3>
+              <div class="meta"><span class="badge">STN ID 0x03</span><span class="badge">SPU → MPU</span><span class="badge time">SPU detect GPU CUDA ~3 ms (Nth)</span></div>
+              <div class="io">Point/image detection on sensor video — <b>performs at the station</b>; uplink: tracklist + video + telemetry.</div>
+              <div class="detail">
+                <div class="drow"><b>IN</b>Sensor video (optical / IR) at the station</div>
+                <div class="drow"><b>PROCESS</b>SPU target detection — GPU CUDA point/image detection on frame N (parallel to the CCPU (N-1) chain)</div>
+                <div class="drow"><b>OUT</b>Local tracklist (Payload 1) + video (SRT comp · 2110 uncomp) + Az/El telemetry (stream 0x03) via MPU</div>
+                <div class="drow"><b>LINK</b>2×10G uplink to L3 Switch — every tracklist frame carries STN ID <b>0x03</b></div>
+                <div class="drow"><b>NOTE</b>Detection runs at the station; CCPU receives the resulting tracklist and does the fusion/tracking chain</div>
+              </div>
+              <span class="hint">▸ click for detail</span>
+            </div>
+            <div class="block stn has-detail">
+              <span class="tag">STN 3 · 2×10G</span>
+              <h3>Sensor Station 3</h3>
+              <div class="meta"><span class="badge">STN ID 0x04</span><span class="badge">SPU → MPU</span><span class="badge time">SPU detect GPU CUDA ~3 ms (Nth)</span></div>
+              <div class="io">Point/image detection on sensor video — <b>performs at the station</b>; uplink: tracklist + video + telemetry.</div>
+              <div class="detail">
+                <div class="drow"><b>IN</b>Sensor video (optical / IR) at the station</div>
+                <div class="drow"><b>PROCESS</b>SPU target detection — GPU CUDA point/image detection on frame N (parallel to the CCPU (N-1) chain)</div>
+                <div class="drow"><b>OUT</b>Local tracklist (Payload 1) + video (SRT comp · 2110 uncomp) + Az/El telemetry (stream 0x03) via MPU</div>
+                <div class="drow"><b>LINK</b>2×10G uplink to L3 Switch — every tracklist frame carries STN ID <b>0x04</b></div>
+                <div class="drow"><b>NOTE</b>Detection runs at the station; CCPU receives the resulting tracklist and does the fusion/tracking chain</div>
+              </div>
+              <span class="hint">▸ click for detail</span>
+            </div>
+          </div>
+          <div class="drops d3">
+            <div class="drop">▼<span>tracklist · Payload 1 · port 5010 (0xAA/0xDC)</span></div>
+            <div class="drop">▼<span>video · SRT · port 5020 · 25 streams</span></div>
+            <div class="drop">▼<span>Az/El telemetry · port 5005 (stream 0x03)</span></div>
+          </div>
+          <div class="block inb has-detail">
+            <span class="tag">10G TSN NETWORK</span>
+            <h3>L3 Switch (TSN Enabled)</h3>
+            <div class="meta"><span class="badge">10G SFP/SFP+</span><span class="badge">VLAN20 uncomp / VLAN30 comp / VLAN35 tracklist · PCP4</span><span class="badge">802.1Qbv</span><span class="badge">SRT</span><span class="badge">PTP GM 1G ETH</span></div>
+            <div class="io">Hub: 3 STNs ↔ Operator Console / GIS Data Interface ↔ Data Base / Inference Server ↔ CCPU. <b>Uncomp. Video IP Stream (10G)</b> + <b>Comp. Data &amp; Video IP Stream (10G)</b> → CCPU ingress.</div>
+            <div class="detail">
+              <div class="drow"><b>FLOW</b> 2×10G per STN (SFP/SFP+) → TSN shaper (802.1Qbv) → egress to CCPU / consoles / GIS / servers</div>
+              <div class="drow"><b>VLAN</b> 20 = uncompressed video · 30 = compressed video · 35 = tracklist — priority PCP4</div>
+              <div class="drow"><b>PORTS</b> 5010 tracklist (Payload 1) · 5020 video (SRT, 25 streams) · 5005 Az/El telemetry (stream 0x03) / CUE (stream 0x05)</div>
+              <div class="drow"><b>PTP</b> 1G ETH uplink to Grandmaster (10.0.0.10) — syncs all TSN scheduling</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+        </div>
+
+        <!-- right column: PTP + servers -->
+        <div class="vstack">
+          <div class="block ptp has-detail">
+            <span class="tag">PTP</span>
+            <h3>GPS Ref Clock</h3>
+            <div class="io">Disciplines the PTP Grandmaster.</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>GPS satellite time (1 PPS + navigation message)</div>
+              <div class="drow"><b>PROCESS</b>Disciplines the PTP Grandmaster oscillator</div>
+              <div class="drow"><b>ROLE</b>Root reference of the whole OSS time system — all 3 STNs + CCPU timestamps trace back to here</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="drop">▼<span>discipline</span></div>
+          <div class="block ptp has-detail">
+            <span class="tag">PTP · 1G ETH</span>
+            <h3>PTP Grandmaster</h3>
+            <div class="meta"><span class="badge">IEEE 802.1AS</span><span class="badge">GM 10.0.0.10</span><span class="badge">&lt;100 ns</span></div>
+            <div class="io">1G ETH to L3 Switch · µs timestamps on all data · network monitoring log (DR-DATA-003).</div>
+            <div class="detail">
+              <div class="drow"><b>PROFILE</b>IEEE 802.1AS (AV bridge) · GM address 10.0.0.10 · sync &lt;100 ns (doc-stated)</div>
+              <div class="drow"><b>FLOW</b>GM sync → L3 Switch (1G ETH) → TSN scheduling + all node clocks → CCPU Timesync Module (PTP Server App, dedicated core)</div>
+              <div class="drow"><b>USE</b>µs timestamps on all data — the 3-station Az/El association depends on this sync</div>
+              <div class="drow"><b>MONITOR</b>Network monitoring log — DR-DATA-003</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="block extb has-detail">
+            <span class="tag">EXTERNAL · SINK</span>
+            <h3>Data Base Server</h3>
+            <div class="meta"><span class="badge">Data &amp; Video IP Stream (10G)</span></div>
+            <div class="io">Fed from L3 Switch (10G).</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>Data &amp; Video IP Stream (10G) fanned out from L3 Switch</div>
+              <div class="drow"><b>ROLE</b>System-level database sink — outside CCPU processing scope</div>
+              <div class="drow"><b>NOTE</b>Shown in the data-flow diagram only; no FR/NFR in the CCPU docs</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="block extb has-detail">
+            <span class="tag">EXTERNAL · SINK</span>
+            <h3>Inference Server</h3>
+            <div class="meta"><span class="badge">Data &amp; Video IP Stream (10G)</span></div>
+            <div class="io">Fed from L3 Switch (10G).</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>Data &amp; Video IP Stream (10G) fanned out from L3 Switch</div>
+              <div class="drow"><b>ROLE</b>External ML inference consumer — runs on the same data/video fan-out</div>
+              <div class="drow"><b>NOTE</b>Shown in the data-flow diagram only; no FR/NFR in the CCPU docs</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- drop: switch → CCPU -->
+    <div class="dropcenter"><div class="drop">▼<span>from L3 Switch: Comp. Data &amp; Video IP Stream (10G) · Uncomp. Video IP Stream (10G) → CCPU ingress</span></div></div>
+
+    <!-- ================================================================
+         CCPU MODULE DOSSIERS (preserved full data-flow content)
+         ================================================================ -->
+    <div class="zone ccpu-zone">
+      <div class="zone-head">CCPU — module dossiers <span class="note-inline">(full data flow per module: IN → PROCESS → OUT → REF / GAP — the same modules shown activated / dormant in the per-mode pipeline views above)</span></div>
+
+      <!-- ingress: stream selection -->
+      <div class="block mod has-detail" style="margin-top:12px">
+        <span class="tag">CCPU INGRESS</span>
+        <h3>IP Video/Data Stream Selection Module</h3>
+        <div class="meta"><span class="badge">port 5020 · SRT</span><span class="badge">25 streams</span><span class="badge">H.264 0x01 / H.265 0x02 / SMPTE 2110 0x03-0x04</span></div>
+        <div class="io">Demux: <b>Comp. Video Stream</b> → Video Acquisition · <b>Uncomp. Video Stream</b> → SMPTE 2110 Gateway · <b>Data Stream</b> (tracklist, Payload 1, idx 20-499) → Data Stream Processing · <b>Timesync Data</b> → Timesync Module.</div>
+        <div class="detail">
+          <div class="drow"><b>CLASSIFY</b> Ingress split by stream ID / payload type (25 video streams total, port 5020, SRT)</div>
+          <div class="drow"><b>0x01 / 0x02</b> H.264 / H.265 (VLAN30) → Comp. Video Stream → Video Acquisition Module</div>
+          <div class="drow"><b>0x03 / 0x04</b> SMPTE 2110 (VLAN20) → Uncomp. Video Stream → SMPTE 2110 Gateway</div>
+          <div class="drow"><b>Payload 1</b> tracklist (idx 20-499, 0xAA/0xDC) → Data Stream → Data Stream Processing Module</div>
+          <div class="drow"><b>PTP</b> Timesync Data → Timesync Module</div>
+        </div>
+        <span class="hint">▸ click for detail</span>
+      </div>
+
+      <!-- drops: demux outputs -->
+      <div class="drops d4" style="margin-top:4px">
+        <div class="drop">▼<span>Uncomp. Video Stream</span></div>
+        <div class="drop">▼<span>Comp. Video Stream</span></div>
+        <div class="drop">▼<span>Data Stream</span></div>
+        <div class="drop">▼<span>Timesync Data</span></div>
+      </div>
+
+      <!-- row A -->
+      <div class="cgrid" style="margin-top:4px">
+        <div class="block mod has-detail">
+          <span class="tag">CCPU MODULE</span>
+          <h3>SMPTE 2110 Gateway</h3>
+          <div class="meta"><span class="badge">streams 0x03 / 0x04</span><span class="badge">HDMI out</span></div>
+          <div class="io">Uncompressed 2110 video → HDMI → <b>Video Wall</b> (decode bypass).</div>
+          <div class="detail">
+            <div class="drow"><b>FLOW</b> 2110 frame unpack (0x03/0x04, uncompressed) → HDMI → Video Wall</div>
+            <div class="drow"><b>NOTE</b> Decode-bypass path — lowest display latency; separate from NVDEC path (compressed)</div>
+          </div>
+          <span class="hint">▸ click for detail</span>
+        </div>
+        <div class="block gpu has-detail">
+          <span class="tag">GPU · NVDEC · Nth</span>
+          <h3>Video Acquisition Module (Decode)</h3>
+          <div class="meta"><span class="badge time">~7 ms</span><span class="badge">FR-PERF-012</span><span class="badge">I-SW-002</span></div>
+          <div class="io">H.264 (0x01) / H.265 (0x02) SRT streams → <b>decoded video frames</b> → Video Wall Interface Module.</div>
+          <div class="detail">
+            <div class="drow"><b>FLOW</b> SRT receive (25 streams, port 5020) → H.264/H.265 demux → NVDEC hardware decode</div>
+            <div class="drow"><b>FRAMING</b> Decodes Nth frame — runs <b>parallel</b> to the (N-1) CPU tracking chain</div>
+            <div class="drow"><b>OUT</b> Decoded video frames → Video Wall Interface Module</div>
+            <div class="drow"><b>REF</b> ~7 ms worst case (FR-PERF-012 · I-SW-002)</div>
+          </div>
+          <span class="hint">▸ click for detail</span>
+        </div>
+        <div class="block seq has-detail">
+          <span class="tag">CPU · (N-1) · SEQ</span>
+          <h3>Data Stream Processing Module</h3>
+          <div class="meta"><span class="badge time">CPU</span><span class="badge">part of FR-PERF-010</span><span class="badge gap">time not stated</span></div>
+          <div class="io">Ingest &amp; validate: 0xAA/0xDC parse · STN ID · OSS/STN MODE · <b>validity ≤1.25 ms</b> · PTP ts check → Data Stream to Algorithm Processing.</div>
+          <div class="detail">
+            <div class="drow"><b>FLOW</b> 0xAA/0xDC frame check → payload idx 20-499 parse → STN ID (0x02/0x03/0x04) extract → OSS/STN MODE check → validity window ≤1.25 ms → PTP µs timestamp check</div>
+            <div class="drow"><b>OUT</b> Validated Data Stream → Algorithm Processing Module</div>
+            <div class="drow"><b>REF</b> part of FR-PERF-010 · no separate timing row <span class="warn">⚠ GAP</span></div>
+          </div>
+          <span class="hint">▸ click for detail</span>
+        </div>
+        <div class="block ptp has-detail">
+          <span class="tag">PTP · DEDICATED CORE</span>
+          <h3>Timesync Module (PTP Server App)</h3>
+          <div class="meta"><span class="badge">IEEE 802.1AS</span><span class="badge">&lt;100 ns</span></div>
+          <div class="io">Receives Timesync Data · continuous PTP lock (same as OS) · µs timestamps on all data.</div>
+          <div class="detail">
+            <div class="drow"><b>FLOW</b> Timesync Data → PTP Server App on dedicated core (same as OS) → lock to GM 10.0.0.10 (&lt;100 ns)</div>
+            <div class="drow"><b>OUT</b> µs timestamps on all data · network monitoring log (DR-DATA-003)</div>
+            <div class="drow"><b>REF</b> IEEE 802.1AS</div>
+          </div>
+          <span class="hint">▸ click for detail</span>
+        </div>
+      </div>
+
+      <!-- drops: row A → row B -->
+      <div class="cgrid" style="margin-top:2px">
+        <div></div>
+        <div class="drop">▼<span>Decoded Video Frames</span></div>
+        <div class="drop">▼<span>Data Stream</span></div>
+        <div></div>
+      </div>
+
+      <!-- row B -->
+      <div class="cgrid">
+        <div></div>
+        <div class="block mod has-detail">
+          <span class="tag">CCPU MODULE</span>
+          <h3>Video Wall Interface Module</h3>
+          <div class="meta"><span class="badge">HDMI out</span></div>
+          <div class="io">Decoded video frames → HDMI → <b>Video Wall Controller</b>; video frames → Data Management Module (logging).</div>
+          <div class="detail">
+            <div class="drow"><b>IN</b>Decoded video frames from Video Acquisition Module</div>
+            <div class="drow"><b>PROCESS</b>Frame buffering / display interfacing — internal decoded frames → HDMI output</div>
+            <div class="drow"><b>OUT 1</b>HDMI → Video Wall Controller (display path)</div>
+            <div class="drow"><b>OUT 2</b>Video frames → Data Management Module (logging path — decoded frames also archived)</div>
+          </div>
+          <span class="hint">▸ click for detail</span>
+        </div>
+        <div class="block seq">
+          <span class="tag">CPU · (N-1) · SEQ</span>
+          <h3>Algorithm Processing Module</h3>
+          <div class="note" style="margin-top:0;margin-bottom:5px">▸ Click a step chip for its detailed flow (IN → PROCESS → OUT → REF / GAP). <b>Mode-dependent:</b> active steps per mode — 01: none · 02: 1-4 + 7 · 03: all 8 (every frame) · 04: none (see per-mode chain strips above).</div>
+          <div class="mini" id="algoMini">
+            <span class="step gapst" data-detail="d-assoc"><b>Association</b><span class="t">FR-PERF-014 · NOT BUDGETED ⚠</span></span><span class="sep">→</span>
+            <span class="step" data-detail="d-kin"><b>Kinematic Derivation</b><span class="t">~3 ms</span></span><span class="sep">→</span>
+            <span class="step" data-detail="d-rang"><b>Passive Ranging</b><span class="t">~2 ms · NFR-ACC-02 ≤2% · ≤20 targets</span></span><span class="sep">→</span>
+            <span class="step" data-detail="d-traj"><b>Trajectory Estimation</b><span class="t">~3 ms · KF/EKF/IMM · FR-CCPU-102</span></span><span class="sep">→</span>
+            <span class="step" data-detail="d-reentry"><b>Reentry Point Calculation</b><span class="t">~2 ms · NFR-ACC-03 ±1 km CEP</span></span><span class="sep">→</span>
+            <span class="step gapst" data-detail="d-lpi"><b>Launch &amp; Impact Point</b><span class="t">FR-PERF-016 · no timing row</span></span><span class="sep">→</span>
+            <span class="step" data-detail="d-cue"><b>Cue Generation</b><span class="t">~3 ms · Az/El 0.001° · stream 0x05</span></span><span class="sep">→</span>
+            <span class="step gapst" data-detail="d-cls"><b>Target Classification</b><span class="t">time not stated</span></span>
+          </div>
+
+          <!-- detailed flow cards (one visible at a time, on click) -->
+          <div class="adetail" id="d-assoc">
+            <div class="drow"><b>STEP</b> Association — FR-PERF-014 (runs <b>before</b> kinematic derivation)</div>
+            <div class="drow"><b>IN</b> 3 STN tracklists (Payload 1 · idx 20-499 · 0xAA/0xDC · STN ID 0x02/0x03/0x04)</div>
+            <div class="drow"><b>PROCESS</b> Pair each station-local track to one central track using PTP-aligned Az/El + µs timestamps — same target, same (N-1) frame across all 3 stations</div>
+            <div class="drow"><b>OUT</b> Central tracklist (≤20 targets) → Kinematic Derivation</div>
+            <div class="drow"><b>GAP</b> <span class="warn">Not budgeted in the pipeline timing table ⚠</span> (see Timing section)</div>
+          </div>
+          <div class="adetail" id="d-kin">
+            <div class="drow"><b>STEP</b> Kinematic Derivation — ~3 ms (worst case)</div>
+            <div class="drow"><b>IN</b> Central tracklist: Az/El per station + ECEF position</div>
+            <div class="drow"><b>PROCESS</b> Differentiate Az/El across consecutive (N-1) frames → angular rates; combine with range → velocity + acceleration in ECEF</div>
+            <div class="drow"><b>OUT</b> Per-target state (position / velocity / acceleration) → Passive Ranging</div>
+          </div>
+          <div class="adetail" id="d-rang">
+            <div class="drow"><b>STEP</b> Passive Ranging — ~2 ms (worst case)</div>
+            <div class="drow"><b>IN</b> Associated Az/El from 3 stations (PTP-synced)</div>
+            <div class="drow"><b>PROCESS</b> Three-station triangulation → slant range; derive ECEF coordinates</div>
+            <div class="drow"><b>CONSTRAINT</b> ≤20 targets per frame · range accuracy ≤2% (NFR-ACC-02)</div>
+            <div class="drow"><b>OUT</b> Range + ECEF → Trajectory Estimation</div>
+          </div>
+          <div class="adetail" id="d-traj">
+            <div class="drow"><b>STEP</b> Trajectory Estimation — ~3 ms (worst case)</div>
+            <div class="drow"><b>IN</b> Ranging + kinematic state</div>
+            <div class="drow"><b>PROCESS</b> Kalman filtering — KF / EKF / IMM (maneuvering targets); predict + update per frame</div>
+            <div class="drow"><b>OUT</b> Trajectory + covariance (stream IDs 05-07) → Reentry Point · Symbology · Logging</div>
+            <div class="drow"><b>REF</b> FR-CCPU-102</div>
+          </div>
+          <div class="adetail" id="d-reentry">
+            <div class="drow"><b>STEP</b> Reentry Point Calculation — ~2 ms (worst case)</div>
+            <div class="drow"><b>IN</b> Trajectory output (position / velocity + covariance)</div>
+            <div class="drow"><b>PROCESS</b> Ballistic projection to atmospheric interface → reentry point</div>
+            <div class="drow"><b>ACCURACY</b> ±1 km CEP (NFR-ACC-03)</div>
+            <div class="drow"><b>OUT</b> Reentry point ECEF — payload bytes 122-136 → Symbology (REP plot) + Cue Generation</div>
+          </div>
+          <div class="adetail" id="d-lpi">
+            <div class="drow"><b>STEP</b> Launch &amp; Impact Point Derivation — FR-PERF-016</div>
+            <div class="drow"><b>IN</b> Trajectory Estimation output</div>
+            <div class="drow"><b>PROCESS</b> Extrapolate fitted trajectory backwards → Launch Point (LP); forwards → Impact Point</div>
+            <div class="drow"><b>OUT</b> LP + impact point ECEF (Long Int) → Symbology plots · Logging · Cueing</div>
+            <div class="drow"><b>GAP</b> <span class="warn">No separate timing row in the pipeline doc ⚠</span></div>
+          </div>
+          <div class="adetail" id="d-cue">
+            <div class="drow"><b>STEP</b> Cue Generation — ~3 ms (on-demand / event, not per-frame)</div>
+            <div class="drow"><b>IN</b> Predicted target position — boost phase (trajectory) / reentry phase (REP region)</div>
+            <div class="drow"><b>PROCESS</b> ECEF → per-station local Az/El (double float · 0.001° resolution)</div>
+            <div class="drow"><b>OUT</b> CUE AzEl — stream 0x05 · port 5005 → Control &amp; Management Module → STN gimbals</div>
+            <div class="drow"><b>REF</b> FR-PERF-013 (boost) · FR-PERF-017 (re-entry)</div>
+            <div class="drow"><b>MODES</b> Per mode spec: Mode 02 continuous re-cue (track maintenance) · Mode 03 high-rate continuous (not event-only) · dormant in Modes 01 &amp; 04</div>
+          </div>
+          <div class="adetail" id="d-cls">
+            <div class="drow"><b>STEP</b> Target Classification — listed in the PNG algorithm box</div>
+            <div class="drow"><b>IN</b> Track state (velocity / acceleration / trajectory shape)</div>
+            <div class="drow"><b>PROCESS</b> Classify target type from kinematic signature</div>
+            <div class="drow"><b>OUT</b> Class flag → Symbology + Logging</div>
+            <div class="drow"><b>GAP</b> <span class="warn">No timing / FR row in the pipeline doc ⚠</span></div>
+            <div class="drow"><b>MODES</b> Per mode spec: live only in Mode 03 (locked/missile state) · dormant in Modes 01, 02 &amp; 04</div>
+          </div>
+
+          <!-- full data-flow view (toggle) -->
+          <button class="flowbtn" id="flowBtn" type="button">▸ show full algorithm data flow</button>
+          <div class="algo-flow" id="algoFlow" style="display:none">
+
+            <div class="fcard" style="--fc:var(--od)">
+              <div class="fhead"><span class="fnum">IN</span>Source — validated tracklist<span class="ftime">from Data Stream Processing Module</span></div>
+              <div class="frow"><b>DATA</b>3 STN local tracks: Az/El + ECEF per station (STN ID 0x02/0x03/0x04) · Payload 1 (idx 20-499) · 0xAA/0xDC frames · PTP µs timestamps · validity ≤1.25 ms</div>
+              <div class="frow"><b>GOES TO</b><span class="dest hot">→ Association (step 1)</span></div>
+            </div>
+            <div class="fnext">▼<span>validated tracklist</span></div>
+
+            <div class="fcard gapf has-how">
+              <div class="fhead"><span class="fnum">1</span>Association<span class="ftime">FR-PERF-014 · ⚠ NOT BUDGETED</span></div>
+              <div class="frow"><b>FROM</b>validated tracklist (3 stations)</div>
+              <div class="frow"><b>PROCESS</b>Group per-station observations of one target into a single central track — HOW:</div>
+              <div class="how">
+                <div class="howl">1 · Collect latest validated tracklists of all STNs (0x02/0x03/0x04) for frame N-1 — every observation carries a PTP µs timestamp</div>
+                <div class="howl">2 · Convert each Az/El observation into an ECEF unit direction vector <span class="fx">d</span> (station position + mount attitude)</div>
+                <div class="howl">3 · Pairwise angular test: <span class="fx">δ(i,j) = acos( dᵢ · dⱼ )</span> — inside gate (sensor accuracy + inter-station parallax) → same-target candidate</div>
+                <div class="howl">4 · Group observations into 3-station tracks; one observation maps to at most one central track (conflict resolution)</div>
+                <div class="howl">5 · Compute group centroid ECEF estimate, weighted by observation quality → central tracklist (≤20 entries)</div>
+              </div>
+              <div class="frow"><b>RESULT</b>Central tracklist — target ID, per-station Az/El, ECEF estimate, timestamp</div>
+              <div class="frow"><b>GOES TO</b><span class="dest hot">→ Kinematic Derivation (step 2)</span><span class="dest">→ Data Management (tracklist archive)</span></div>
+              <span class="hhint">▸ click for HOW steps</span>
+            </div>
+            <div class="fnext">▼<span>central tracklist</span></div>
+
+            <div class="fcard has-how">
+              <div class="fhead"><span class="fnum">2</span>Kinematic Derivation<span class="ftime">~3 ms</span></div>
+              <div class="frow"><b>FROM</b>central tracklist (Az/El + ECEF)</div>
+              <div class="frow"><b>PROCESS</b>Turn Az/El angle history into a linear state vector — HOW:</div>
+              <div class="how">
+                <div class="howl">1 · Take the target’s Az/El history over consecutive (N-1) frames: <span class="fx">Az_k, El_k</span> and <span class="fx">Az_k-1, El_k-1</span></div>
+                <div class="howl">2 · Angular rates by finite difference: <span class="fx">ω_Az = (Az_k − Az_k-1) / Δt</span> · <span class="fx">ω_El = (El_k − El_k-1) / Δt</span> — Δt from PTP µs timestamps</div>
+                <div class="howl">3 · Build line-of-sight vector <span class="fx">d_k</span> from Az/El (station mount frame → rotate to ECEF)</div>
+                <div class="howl">4 · Position from tracklist ECEF (previous ranging cycle): <span class="fx">p_k = p_station + R_k · d_k</span></div>
+                <div class="howl">5 · Linear velocity by position differencing: <span class="fx">v_k = (p_k − p_k-1) / Δt</span></div>
+                <div class="howl">6 · Acceleration: <span class="fx">a_k = (v_k − v_k-1) / Δt</span></div>
+                <div class="howl">7 · First-order smoothing filter on v/a to suppress measurement noise before hand-off to the KF (step 4)</div>
+              </div>
+              <div class="frow"><b>RESULT</b>Per-target state vector — position · velocity · acceleration</div>
+              <div class="frow"><b>GOES TO</b><span class="dest hot">→ Passive Ranging (step 3)</span><span class="dest">→ Data Management (state archive)</span></div>
+              <span class="hhint">▸ click for HOW steps</span>
+            </div>
+            <div class="fnext">▼<span>state vector</span></div>
+
+            <div class="fcard has-how">
+              <div class="fhead"><span class="fnum">3</span>Passive Ranging<span class="ftime">~2 ms · NFR-ACC-02 ≤2%</span></div>
+              <div class="frow"><b>FROM</b>kinematic state + 3-station Az/El (PTP-synced)</div>
+              <div class="frow"><b>PROCESS</b>Triangulate 3 station sight-lines into range + ECEF — HOW:</div>
+              <div class="how">
+                <div class="howl">1 · Build a ray per station: origin = station ECEF <span class="fx">O₁, O₂</span>, direction = <span class="fx">d₁, d₂</span> from its Az/El (PTP-synced same frame)</div>
+                <div class="howl">2 · Closest point of approach of the two rays: <span class="fx">n = d₁ × d₂</span> · <span class="fx">t₁ = ((O₂−O₁)·(d₂×n)) / (d₁·(d₂×n))</span> · <span class="fx">p = O₁ + t₁·d₁</span></div>
+                <div class="howl">3 · Range: <span class="fx">R = |p − O₁|</span> — the 3rd station’s ray refines p by least squares (redundancy → better accuracy)</div>
+                <div class="howl">4 · Accuracy gate: range error ≤2% (NFR-ACC-02) — targets failing the gate are flagged/dropped</div>
+                <div class="howl">5 · Cap at ≤20 targets per frame</div>
+              </div>
+              <div class="frow"><b>RESULT</b>Range + ECEF coordinates — ≤20 targets · accuracy ≤2%</div>
+              <div class="frow"><b>GOES TO</b><span class="dest hot">→ Trajectory Estimation (step 4)</span><span class="dest">→ Data Management (range log)</span></div>
+              <span class="hhint">▸ click for HOW steps</span>
+            </div>
+            <div class="fnext">▼<span>range + ECEF</span></div>
+
+            <div class="fcard has-how">
+              <div class="fhead"><span class="fnum">4</span>Trajectory Estimation<span class="ftime">~3 ms · KF/EKF/IMM · FR-CCPU-102</span></div>
+              <div class="frow"><b>FROM</b>range + ECEF + state vector</div>
+              <div class="frow"><b>PROCESS</b>Run the Kalman cycle on each (N-1) frame — HOW:</div>
+              <div class="how">
+                <div class="howl">1 · State vector <span class="fx">x = [p ; v ; a]</span> in ECEF (Coriolis term in dynamics); process models: constant-accel (ballistic) + maneuver</div>
+                <div class="howl">2 · PREDICT: <span class="fx">x⁻ = F·x</span> · <span class="fx">P⁻ = F·P·Fᵀ + Q</span> (F from dynamics, Q = process noise)</div>
+                <div class="howl">3 · MEASURE: <span class="fx">z</span> = current-frame range/ECEF (step 3) + kinematic state (step 2)</div>
+                <div class="howl">4 · UPDATE: innovation <span class="fx">ν = z − H·x⁻</span> · <span class="fx">S = H·P⁻·Hᵀ + R</span> · gain <span class="fx">K = P⁻·Hᵀ·S⁻¹</span> · <span class="fx">x = x⁻ + K·ν</span> · <span class="fx">P = (I − K·H)·P⁻</span></div>
+                <div class="howl">5 · EKF variant: H linearized by Jacobian — Az/El → ECEF measurements are nonlinear</div>
+                <div class="howl">6 · IMM variant: run CV / CA / maneuver filters in parallel, weight each by innovation likelihood, mix states — handles target maneuvers</div>
+                <div class="howl">7 · Store trajectory history + covariance P for downstream steps</div>
+              </div>
+              <div class="frow"><b>RESULT</b>Fitted trajectory + covariance (stream IDs 05-07)</div>
+              <div class="frow"><b>GOES TO</b><span class="dest hot">→ Reentry Point Calculation (step 5)</span><span class="dest">→ Symbology &amp; Overlay (trajectory plots)</span><span class="dest">→ Data Management (logging)</span><span class="dest">→ Cue Generation (step 7, boost phase)</span></div>
+              <span class="hhint">▸ click for HOW steps</span>
+            </div>
+            <div class="fnext">▼<span>trajectory + covariance</span></div>
+
+            <div class="fcard has-how">
+              <div class="fhead"><span class="fnum">5</span>Reentry Point Calculation<span class="ftime">~2 ms · NFR-ACC-03 ±1 km CEP</span></div>
+              <div class="frow"><b>FROM</b>trajectory + covariance</div>
+              <div class="frow"><b>PROCESS</b>Project the fitted trajectory into the atmosphere — HOW:</div>
+              <div class="how">
+                <div class="howl">1 · Take current KF state (p, v, a) + covariance at t₀</div>
+                <div class="howl">2 · Ballistic propagation: numerically integrate the equations of motion (gravity-dominated, drag term where applicable) forward in time</div>
+                <div class="howl">3 · Stop at atmospheric interface <span class="fx">h = 80 km</span> → <span class="fx">t_RE, p_RE</span> = reentry point</div>
+                <div class="howl">4 · Propagate covariance to t_RE (linearization of the flow) → reentry uncertainty ellipse</div>
+                <div class="howl">5 · Check CEP ≤1 km (NFR-ACC-03); encode <span class="fx">p_RE</span> as Long Int ECEF → payload bytes 122-136</div>
+              </div>
+              <div class="frow"><b>RESULT</b>Reentry point ECEF — payload bytes 122-136 · ±1 km CEP</div>
+              <div class="frow"><b>GOES TO</b><span class="dest">→ Symbology &amp; Overlay (REP plot)</span><span class="dest hot">→ Cue Generation (step 7, reentry phase)</span><span class="dest">→ Data Management (logging)</span></div>
+              <span class="hhint">▸ click for HOW steps</span>
+            </div>
+            <div class="fnext">▼<span>REP + trajectory data</span></div>
+
+            <div class="fcard gapf has-how">
+              <div class="fhead"><span class="fnum">6</span>Launch &amp; Impact Point Derivation<span class="ftime">FR-PERF-016 · ⚠ no timing row</span></div>
+              <div class="frow"><b>FROM</b>trajectory estimation output (step 4)</div>
+              <div class="frow"><b>PROCESS</b>Integrate the fitted trajectory both directions — HOW:</div>
+              <div class="how">
+                <div class="howl">1 · Backward integration of the fitted dynamics to the launch event (t = 0 / launch velocity signature) → Launch Point (LP)</div>
+                <div class="howl">2 · Forward integration of the same fitted trajectory to ground (<span class="fx">h = 0</span>) → Impact Point</div>
+                <div class="howl">3 · Both encoded as ECEF Long Int in the tracklist payload</div>
+              </div>
+              <div class="frow"><b>RESULT</b>LP + impact point ECEF (Long Int)</div>
+              <div class="frow"><b>GOES TO</b><span class="dest">→ Symbology &amp; Overlay (LP / impact plots)</span><span class="dest">→ Data Management (logging)</span><span class="dest">→ Cue Generation (step 7)</span></div>
+              <span class="hhint">▸ click for HOW steps</span>
+            </div>
+            <div class="fnext">▼<span>predicted target position</span></div>
+
+            <div class="fcard has-how">
+              <div class="fhead"><span class="fnum">7</span>Cue Generation<span class="ftime">~3 ms · on demand · FR-PERF-013/017</span></div>
+              <div class="frow"><b>FROM</b>predicted target position — boost phase (trajectory) / reentry phase (REP region)</div>
+              <div class="frow"><b>PROCESS</b>Convert a predicted target position into gimbal angles — HOW:</div>
+              <div class="how">
+                <div class="howl">1 · Event trigger: boost phase (FR-PERF-013) or reentry phase (FR-PERF-017) — not every frame <span class="warn">(per mode spec: continuous re-cue in Mode 02, high-rate in Mode 03 ⚠)</span></div>
+                <div class="howl">2 · Lookahead: predict target ECEF at <span class="fx">t_cue = now + gimbal slew time</span> (so the station arrives in time)</div>
+                <div class="howl">3 · Per station: topocentric transform — <span class="fx">p_rel = p_target − p_station</span>, rotate into station E-N-U frame using geodetic lat/lon</div>
+                <div class="howl">4 · <span class="fx">Az = atan2(E, N)</span> · <span class="fx">El = atan2(U, √(N²+E²))</span></div>
+                <div class="howl">5 · Quantize to 0.001°, pack as IEEE double float</div>
+                <div class="howl">6 · Emit CUE AzEl — stream 0x05 · port 5005</div>
+              </div>
+              <div class="frow"><b>RESULT</b>CUE AzEl — stream 0x05 · port 5005</div>
+              <div class="frow"><b>GOES TO</b><span class="dest hot">→ Control &amp; Management → L3 Switch → MPU → SPU → Gimbal (RS422)</span><span class="dest">→ Symbology &amp; Overlay (cue display)</span></div>
+              <span class="hhint">▸ click for HOW steps</span>
+            </div>
+            <div class="fnext">▼<span>track state (from all steps)</span></div>
+
+            <div class="fcard gapf has-how">
+              <div class="fhead"><span class="fnum">8</span>Target Classification<span class="ftime">⚠ no timing / FR row</span></div>
+              <div class="frow"><b>FROM</b>track state — velocity · acceleration · trajectory shape</div>
+              <div class="frow"><b>PROCESS</b>Read the target type off its motion signature — HOW:</div>
+              <div class="how">
+                <div class="howl">1 · Compute kinematic signature from track state: speed <span class="fx">|v|</span> · accel <span class="fx">|a|</span> · turn rate · trajectory curvature</div>
+                <div class="howl">2 · Match signature against rule table / thresholds — e.g. high speed + high accel + parabolic arc → ballistic/rocket · sustained maneuver + lower speed → aircraft/UAV · decaying energy → debris</div>
+                <div class="howl">3 · Hold class across frames (hysteresis) to stabilize the flag before output</div>
+              </div>
+              <div class="frow"><b>RESULT</b>Class flag per target</div>
+              <div class="frow"><b>GOES TO</b><span class="dest">→ Symbology &amp; Overlay (overlay)</span><span class="dest">→ Data Management (logging)</span></div>
+              <span class="hhint">▸ click for HOW steps</span>
+            </div>
+
+            <div class="note" style="margin-top:10px">Frame discipline: whole module runs on <b>(N-1)</b> — detection happens on the Nth frame at the stations (parallel, GPU CUDA ~3 ms). Per the original pipeline doc, steps 1-6 re-run every frame and step 7 fires only on event (boost / reentry). <b>Mode-dependent (per mode spec):</b> Mode 02 runs steps 1-4 + 7 with continuous re-cueing; Mode 03 runs all 8 every frame with high-rate continuous cue; Modes 01 &amp; 04 run none. Branch destinations (Symbology, Data Management) consume the same (N-1) results in parallel.</div>
+          </div>
+
+          <div class="io" style="margin-top:8px"><b>Egress:</b> Cueing data to sensor stations (↑ L3 Switch · stream 0x05 · port 5005) · Processed Data → Symbology &amp; Overlay · Processed Data + Track list archives → Data Management.</div>
+          <div class="listbox" style="margin-top:9px">
+            <h4>Algorithms (per data flow)</h4>
+            <ul>
+              <li>Passive Ranging</li>
+              <li>Trajectory Prediction</li>
+              <li>Impact point prediction</li>
+              <li>Launch point prediction</li>
+              <li>Re-entry point prediction</li>
+              <li>Target classification</li>
+            </ul>
+          </div>
+          <div class="note">Association (FR-PERF-014, before kinematic) — <span class="warn">NOT BUDGETED (GAP)</span> · Reentry ECEF bytes 122-136 · LP/impact ECEF Long Int.</div>
+        </div>
+        <div class="block par has-detail">
+          <span class="tag">FILE SYSTEM · REDUNDANT</span>
+          <h3>Data Management Module</h3>
+          <div class="meta"><span class="badge time">~2 ms</span><span class="badge">FR-PERF-018 · FR-CCPU-203</span><span class="badge gap">SRS resource unspecified</span></div>
+          <div class="io">Video frames (from Video Wall Interface) + Track list archives + algorithm outputs (raw uncomp + comp video) → <b>Data Storage (Short &amp; Long term, SAN 10G)</b>; Processed Data &amp; Logs → Control &amp; Management.</div>
+          <div class="detail">
+            <div class="drow"><b>IN</b> Video frames (Video Wall Interface Module) · Processed Data + Track list archives (Algorithm Processing) · raw uncomp + comp video + algorithm outputs</div>
+            <div class="drow"><b>FLOW</b> Write to redundant file system → SAN (10G SFP/SFP+)</div>
+            <div class="drow"><b>OUT</b> Data Storage (Short &amp; Long term) · Processed Data + Logs → Control &amp; Management Module</div>
+            <div class="drow"><b>REF</b> ~2 ms (FR-PERF-018) · FR-CCPU-203 · SRS resource <span class="warn">⚠ GAP</span></div>
+            <div class="drow"><b>MODES</b> Per mode spec: explicit event logging in Mode 03; per-mode state not stated in Modes 01/02/04 ⚠ (original flow also archives decoded video frames)</div>
+          </div>
+          <span class="hint">▸ click for detail</span>
+        </div>
+      </div>
+
+      <!-- drops: row B → row C -->
+      <div class="cgrid" style="margin-top:2px">
+        <div></div>
+        <div class="drop">▼<span>Processed Data</span></div>
+        <div class="drop">▼<span>Processed Data · Track list archives</span></div>
+        <div class="drop">▼<span>Processed Data · Logs</span></div>
+      </div>
+
+      <!-- row C -->
+      <div class="cgrid">
+        <div></div>
+        <div class="block gpu has-detail">
+          <span class="tag">CPU + GPU · (N-1)</span>
+          <h3>Symbology &amp; Overlay Generation</h3>
+          <div class="meta"><span class="badge time">~2 ms</span><span class="badge">FR-CCPU-201</span></div>
+          <div class="io">Target Az/El · velocity · trajectory plots (LP, REP, impact) · status overlays → HDMI → <b>Video Wall Controller</b>.</div>
+          <div class="detail">
+            <div class="drow"><b>IN</b> Track state (Az/El, velocity) + LP / REP / impact points (Algorithm Processing)</div>
+            <div class="drow"><b>FLOW</b> Render symbology / overlay (CPU+GPU, frame N-1) → composite over decoded video</div>
+            <div class="drow"><b>OUT</b> HDMI → Video Wall Controller</div>
+            <div class="drow"><b>REF</b> ~2 ms (FR-CCPU-201)</div>
+            <div class="drow"><b>MODES</b> Per mode spec: base symbology (view labels · status · crosshair · time/UTC) in Mode 01 · + track-box/target symbology in Mode 02 · + urgent/colored alert symbology state in Mode 03 · not stated in Mode 04 ⚠</div>
+          </div>
+          <span class="hint">▸ click for detail</span>
+        </div>
+        <div class="listbox">
+          <h4>Operations</h4>
+          <ul>
+            <li>System Health monitoring</li>
+            <li>Sensor Health monitoring</li>
+            <li>Built-in-test</li>
+            <li>Network monitoring</li>
+            <li>Configuration of sensor &amp; Gimbal</li>
+            <li>Application handling (IP Comm)</li>
+            <li>Log management</li>
+          </ul>
+        </div>
+        <div class="block outb has-detail">
+          <span class="tag">CPU · EVENT</span>
+          <h3>Control &amp; Management Module</h3>
+          <div class="meta"><span class="badge time">~3 ms</span><span class="badge">I-SW-003</span></div>
+          <div class="io">Console commands (Payload 2) + <b>Az/El cue (stream 0x05)</b> → C&amp;C to STNs via L3 Switch (sensor config, tracking params, system control) · Processed Data, Logs, <b>OSS Config</b> egress · HDMI → Video Wall Controller.</div>
+          <div class="detail">
+            <div class="drow"><b>IN</b> Console commands (Payload 2 · streams 0x02/0x06/0x08/0x09) · Az/El cue (stream 0x05) · Logs (Data Management)</div>
+            <div class="drow"><b>FLOW</b> Merge + prioritize (Override/Manual passes all commands) → C&amp;C to STNs via L3 Switch: sensor config, tracking params, system control</div>
+            <div class="drow"><b>OUT</b> Control egress (↑ L3 Switch) · Processed Data, Logs, OSS Config · HDMI → Video Wall Controller</div>
+            <div class="drow"><b>REF</b> ~3 ms event-driven (I-SW-003)</div>
+            <div class="drow"><b>MODES</b> Per mode spec: cue egress in Modes 02-03 (continuous / high-rate) · in Mode 04 ALL commands pass through CCPU (no bypass — 0x08 Override / 0x09 Manual) · Mode 01 state not stated ⚠</div>
+          </div>
+          <span class="hint">▸ click for detail</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- drops: CCPU → egress -->
+    <div class="drops d3" style="margin-top:12px">
+      <div class="drop">▼<span>HDMI — Video Wall Interface · Symbology &amp; Overlay · Control &amp; Mgmt (SMPTE 2110 GW → Video Wall direct)</span></div>
+      <div class="drop">▼<span>Control · Payload 2 + Az/El cue (stream 0x05 · port 5005) → L3 Switch</span></div>
+      <div class="drop">▼<span>Processed Data · Ctrl Msg · Logs · Videos (10G)</span></div>
+    </div>
+
+    <!-- ================================================================
+         EGRESS (preserved)
+         ================================================================ -->
+    <div class="egress">
+
+      <!-- display egress -->
+      <div>
+        <div class="lane-head"><span class="c-ext">Display Egress — video wall</span></div>
+        <div class="vstack">
+          <div class="block extb has-detail">
+            <span class="tag">EXTERNAL · HDMI HUB</span>
+            <h3>Video Wall Controller</h3>
+            <div class="meta"><span class="badge">HDMI in: VWM · Symbology · C&amp;M</span></div>
+            <div class="io">HDMI out → Video Wall · Operator Console · GIS Data Interface.</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>HDMI ×3 — Video Wall Interface Module · Symbology &amp; Overlay Generation · Control &amp; Management Module</div>
+              <div class="drow"><b>PROCESS</b>HDMI input switching + layout / scaling of the display wall</div>
+              <div class="drow"><b>OUT</b>HDMI → Video Wall (main) · Operator Console (console display) · GIS Data Interface (GIS display)</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="drop">▼<span>HDMI</span></div>
+          <div class="block extb has-detail">
+            <span class="tag">OUT</span>
+            <h3>Video Wall</h3>
+            <div class="meta"><span class="badge">HDMI in: VWC + SMPTE 2110 Gateway</span></div>
+            <div class="io">Live display to Video Wall / Operator Consoles.</div>
+            <div class="detail">
+              <div class="drow"><b>IN 1</b>HDMI from Video Wall Controller — decoded video + symbology/overlay composite</div>
+              <div class="drow"><b>IN 2</b>HDMI direct from SMPTE 2110 Gateway — uncompressed feed (decode bypass, lowest display latency)</div>
+              <div class="drow"><b>ROLE</b>Primary operator display — live sensor video with target symbology (Az/El, velocity, LP/REP/impact plots)</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- control egress -->
+      <div>
+        <div class="lane-head"><span class="c-out">Control Egress — command control → gimbal control <span style="font-weight:400;text-transform:none">· per SRS/IRS, not shown in PNG</span></span></div>
+        <div class="vstack">
+          <div class="block outb has-detail">
+            <span class="tag">EGRESS · 10G</span>
+            <h3>C&amp;C Route (CCPU → STN)</h3>
+            <div class="meta"><span class="badge">Payload 2</span><span class="badge">CCPU → L3 Switch → MPU → SPU</span></div>
+            <div class="io">Tracking params, sensor config, system control.</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>Control &amp; Management output — console commands (Payload 2) + CUE AzEl (stream 0x05 · port 5005)</div>
+              <div class="drow"><b>ROUTE</b>CCPU → L3 Switch (TSN) → station MPU → SPU</div>
+              <div class="drow"><b>CARRIES</b>Sensor config · tracking params · system control · cue commands</div>
+              <div class="drow"><b>NOTE</b>In Override/Manual mode all console commands pass through CCPU on this route — no bypass</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="drop">▼<span>Payload 2 · CCPU → MPU → SPU</span></div>
+          <div class="block outb has-detail">
+            <span class="tag">RS422</span>
+            <h3>Gimbal Control (RS422)</h3>
+            <div class="meta"><span class="badge time">~0.4 ms</span><span class="badge">921 kbps · 10 ms</span></div>
+            <div class="io">Station side: MPU → SPU → Gimbal H/W (RS422 921 kbps, 10 ms command rate).</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>Cue Az/El received by SPU via the C&amp;C route</div>
+              <div class="drow"><b>LINK</b>RS422 serial · 921 kbps · 10 ms command cycle (station-side hardware)</div>
+              <div class="drow"><b>FLOW</b>MPU → SPU → gimbal servo drive</div>
+              <div class="drow"><b>REF</b>~0.4 ms doc-stated worst case (visible only with timing toggle on)</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="drop">▼<span>gimbal command</span></div>
+          <div class="block outb has-detail">
+            <span class="tag">EGRESS</span>
+            <h3>STN Gimbal (Closed Loop)</h3>
+            <div class="meta"><span class="badge">route CCPU→MPU→SPU→Gimbal (IRS §10)</span></div>
+            <div class="io">Deliberate <b>1-frame (N-1) delay</b> — detection on Nth (parallel), tracking/cueing chain on (N-1)th (sequential). Pipeline p1 note.</div>
+            <div class="detail">
+              <div class="drow"><b>CLOSED LOOP</b>Station gimbal servo tracks the cued Az/El continuously; CCPU re-cues as the trajectory updates each (N-1) frame</div>
+              <div class="drow"><b>FRAMING</b>Deliberate 1-frame design — detection on frame N (station GPU, parallel), tracking/cueing on frame N-1 (CCPU, sequential)</div>
+              <div class="drow"><b>REF</b>Route CCPU→MPU→SPU→Gimbal (IRS §10) · pipeline p1 note</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- storage egress -->
+      <div>
+        <div class="lane-head"><span class="c-par">Storage Egress — data &amp; GIS</span></div>
+        <div class="vstack">
+          <div class="block par has-detail">
+            <span class="tag">STORAGE</span>
+            <h3>Data Storage (Short &amp; Long term)</h3>
+            <div class="meta"><span class="badge">SAN 10G SFP/SFP+</span><span class="badge">NFR-REL-02</span></div>
+            <div class="io">Raw uncomp + comp video, tracklist archives, logs. <b>Live playback</b> — low-latency access for tuning; <b>post-event playback</b> — redundant fault-tolerant archive.</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>From Data Management Module — raw uncomp + comp video · tracklist archives · state/trajectory/REP/LP/impact data · class flags · logs</div>
+              <div class="drow"><b>SHORT-TERM</b>Low-latency store for <b>live playback</b> — real-time access for tuning (NFR-REL-02)</div>
+              <div class="drow"><b>LONG-TERM</b>Redundant fault-tolerant archive for <b>post-event playback</b> (NFR-REL-02)</div>
+              <div class="drow"><b>OUT</b>Processed Sensor Data (10G) → GIS Interface</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+          <div class="drop">▼<span>Processed Sensor Data (10G)</span></div>
+          <div class="block par has-detail">
+            <span class="tag">OUT</span>
+            <h3>GIS Interface</h3>
+            <div class="io">Processed Sensor Data (10G) to GIS.</div>
+            <div class="detail">
+              <div class="drow"><b>IN</b>Processed Sensor Data (10G) from Data Storage (Short &amp; Long term)</div>
+              <div class="drow"><b>ROLE</b>CCPU egress to GIS systems — target/track data for geospatial display &amp; analysis</div>
+            </div>
+            <span class="hint">▸ click for detail</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         SOURCE MODE DIAGRAMS — REPORT (4 source PNGs, report under each)
+         ================================================================ -->
+    <div class="zone">
+      <div class="zone-head">Source Mode Diagrams — Report <span class="note-inline">(the 4 source PNGs; a report sits under each figure — as drawn, cross-referenced with the mode tabs and module dossiers above)</span></div>
+
+      <figure class="srcfig">
+        <img src="01_CCPU_Data_Flow.png" alt="CCPU master data flow diagram — all modules inside the CCPU boundary, L3 Switch TSN, PTP Grandmaster, video wall, data storage" loading="lazy">
+        <figcaption>FIG 01 · 01_CCPU_Data_Flow.png — master architecture: every CCPU module, as drawn in the source document</figcaption>
+      </figure>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a1)"></span> Report — Fig 01 · Master Data Flow (mode-independent)</div>
+        </div>
+        <ul class="modenotes" style="--ma:var(--a1)">
+          <li><b>Scope.</b> The complete CCPU topology as drawn: all modules inside the dashed CCPU boundary — IP Video/Data Stream Selection, SMPTE 2110 Gateway, Video Acquisition, Data stream Processing, Timesync, Algorithm Processing, Data Formatting &amp; Archiving, Symbology &amp; Overlay Generation, Video Wall Controller Interface, Control &amp; Management — plus external elements: 3 Sensor Stations (2×10G) via L3 Switch (TSN Enabled), PTP Grandmaster (1G ETH) ← GPS Ref Clock, Data Base Server / Inference Server, and the Video Wall Controller drawn <b>outside</b> the boundary (Video Wall · Console · GIS Interface).</li>
+          <li><b>Algorithm region.</b> The Algorithm Processing Module lists seven named algorithms — Cueing, Passive Ranging, Trajectory Prediction, Impact point prediction, Launch point prediction, Re-entry point prediction, Target classification — the same set the 8-step chain above decomposes (association/kinematic are the pipeline document's steps, not figure boxes).</li>
+          <li><b>Mapping.</b> This figure is <b>mode-independent</b>: it shows what exists in every mode. The four mode tabs (01 SCAN · 02 DETECT · 03 LOCK/ALERT · 04 MANUAL) decide which of these modules is active per mode; Figs 02–04 below are the per-mode views.</li>
+          <li><b>Values.</b> The figure carries <span class="gapchip">⚠ NO VALUES</span> — no ports, VLAN/PCP, stream IDs, STN IDs, or timings are drawn. All numeric values in this document (ports 5010/5020/5005, streams 0x01–0x09, latencies, NFRs) come from SRS/IRS/pipeline docs — see the dossiers above and the timing summary below.</li>
+          <li><b>Gimbal egress.</b> No gimbal/RS422 path is drawn in this figure — only the console → C&amp;M path. The gimbal egress (RS422, 921 kbps, 10 ms cycle) is retained from SRS/IRS in the egress section above, as flagged there.</li>
+        </ul>
+      </div>
+
+      <figure class="srcfig">
+        <img src="02_CCPU_Surveillance_Mode.png" alt="CCPU surveillance mode diagram — track lists from all 3 stations to symbology and archiving" loading="lazy">
+        <figcaption>FIG 02 · 02_CCPU_Surveillance_Mode.png — surveillance view: track list reception → display + archive</figcaption>
+      </figure>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a1)"></span> Report — Fig 02 · Surveillance → MODE 01 (SCAN/SURVEILLANCE)</div>
+        </div>
+        <ul class="modenotes" style="--ma:var(--a1)">
+          <li><b>As drawn.</b> “Target track list with timestamp from all 3 Sensor stations” (up to 20 target track list from each station) → L3 Switch (TSN Enabled) → IP Video/Data Stream Selection → Data stream Processing (“Target Parameters up to 20 targets”) → two fan-outs: <b>Symbology &amp; Overlay Generation</b> → Video Wall Controller Interface → Video Wall Controller, and <b>Data Formatting archiving</b> → Data Storage (Short &amp; Long term), “Archived Data”.</li>
+          <li><b>Mapping to MODE 01.</b> This is the display-only mode: the two active flows in the tab are exactly the ones this figure draws — composites to the video wall and archiving. No cueing arrows, no alert symbology, no algorithm boxes — consistent with the 8-step chain being dormant in MODE 01.</li>
+          <li><b>Discrepancy (flagged, not resolved).</b> <span class="gapchip">⚠ M1</span> The figure shows the track list being <b>processed</b> by the CCPU (Data stream Processing → Target Parameters → symbology + archive), while the MODE 01 spec states the tracklist <b>may be received but is not processed</b> (display-only composites). The figure's level of granularity is coarser than the mode spec — the mode tabs/dossiers above are authoritative for what “processing” means per mode.</li>
+        </ul>
+      </div>
+
+      <figure class="srcfig">
+        <img src="03_CCPU_Alert_Mode.png" alt="CCPU alert mode diagram — locked target track list and cue commands to other sensor stations" loading="lazy">
+        <figcaption>FIG 03 · 03_CCPU_Alert_Mode.png — alert view: locked track in one station, cue out to the others</figcaption>
+      </figure>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a2)"></span> Report — Fig 03 · Alert → MODE 02 (TARGET DETECT) + alert propagation of MODE 03</div>
+        </div>
+        <ul class="modenotes" style="--ma:var(--a2)">
+          <li><b>As drawn.</b> “Missile Locked in Sensor Station X” → “Locked Target Track list” → “CCPU generate cue commands to respective sensor station (Y/Z)” → “Cueing data” → “Respective sensor Station (Y/Z) process the cue data &amp; wait as per the cue coordinates”. Bottom path: L3 ↔ CCPU bidirectional — locked target track list in from one station, cueing data out to the respective stations (drawn at both IP-selection and Data stream Processing level); Data stream Processing → “Cueing Algorithm for Tracking” (single box) → Target Parameters → Symbology &amp; Overlay + Data Formatting archiving; “Az, El Angles to sensor station” leaves the cueing box; Video Wall Controller Interface → Video Wall Controller; Data Storage ↔ Archived Data.</li>
+          <li><b>Mapping.</b> Covers MODE 02 (TARGET DETECT): cue generation + sustained targeting — the “process the cue data &amp; <b>wait as per the cue coordinates</b>” behavior is the cue-and-hold state, i.e., continuous re-cueing keeps Y/Z parked on the target. The locked-track-in / cue-out topology also illustrates MODE 03's alert propagation (one station's lock drives the others).</li>
+          <li><b>Discrepancy (flagged, not resolved).</b> <span class="gapchip">⚠ M2</span> The full 8-step chain is collapsed into a single “Cueing Algorithm for Tracking” box — Association, Kinematic Derivation, Ranging, Trajectory, Re-entry, LP/impact, and Classification are not drawn (Re-entry/LP-impact/Classification are dormant in MODE 02 per the mode spec anyway; the live steps 1–4 + 7 are itemized in the dossiers above).</li>
+          <li><b>Values.</b> No ports, stream IDs, or timings in the figure; the cue stream (0x05, port 5005) and cue rates cited in the MODE 02/03 tabs come from SRS/IRS/pipeline docs.</li>
+        </ul>
+      </div>
+
+      <figure class="srcfig">
+        <img src="04_CCPU_Locked_Mode.png" alt="CCPU locked mode diagram — dual-station lock, boost-phase cueing and passive ranging / trajectory estimation for re-entry cueing" loading="lazy">
+        <figcaption>FIG 04 · 04_CCPU_Locked_Mode.png — locked view: boost + re-entry cueing with the algorithm sub-region drawn out</figcaption>
+      </figure>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--a3)"></span> Report — Fig 04 · Locked → MODE 03 (TARGET LOCK / MISSILE DETECT / ALERT)</div>
+        </div>
+        <ul class="modenotes" style="--ma:var(--a3)">
+          <li><b>As drawn.</b> “Missile Locked in Sensor Station X &amp; Sensor Station Y” → “Locked Target Track list” → “CCPU generate cue commands for Boost phase &amp; Re-entry point” → “Cueing data” → “Sensor Station Z process the cue data &amp; wait at Re-entry point coordinates”. Bottom: L3 → IP Selection → Data stream Processing → the Algorithm Processing sub-region, drawn with <b>two parallel branches</b> — LEFT (boost): “Az, El Angles to sensor station” + “Locked Target Track list with timestamp” → “Cueing Algorithm for Boost Phase” → Processed Data; RIGHT (re-entry): “Locked Target Track list with timestamp” → “Passive Ranging” → “Locked Track list with ECEF Coordinates” → “Trajectory Estimation (Launch, Re-entry, Impact Points Prediction)” → “Re-entry point coordinates” → “Cueing Algorithm for Re-entry” → “Az, El Angles to sensor station” → Processed Data. Both branches then feed Symbology &amp; Overlay Generation → Video Wall Controller Interface → Video Wall Controller, and Data Formatting archiving → Archived Data → Data Storage (Short &amp; Long term).</li>
+          <li><b>Mapping to MODE 03.</b> The only figure that draws algorithm depth: Passive Ranging and Trajectory Estimation are live and feed <b>both</b> boost-phase and re-entry cueing — i.e., the full 8-step chain operating every frame, per the MODE 03 tab. “Wait at Re-entry point coordinates” = cue-and-hold on the predicted re-entry point.</li>
+          <li><b>Coordinate frame.</b> Only this figure names the frame — <b>ECEF</b> after Passive Ranging — matching the dossier value (0.001° IEEE double) for the trajectory products.</li>
+          <li><b>Discrepancy (flagged, not resolved).</b> <span class="gapchip">⚠ M3</span> The figure's single “Trajectory Estimation (Launch, Re-entry, Impact Points Prediction)” box bundles what the pipeline document decomposes into separate steps (Trajectory Prediction · Launch point prediction · Re-entry point prediction · Impact point prediction); Association and Kinematic Derivation are again not drawn (documented in the pipeline docs — retained in the dossiers above). No timing values in the figure.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon" style="background:var(--border-dark)"></span> Overall Report — Figure → Mode Mapping &amp; Discrepancy Register</div>
+        </div>
+        <ul class="modenotes">
+          <li><b>Figure → tab mapping.</b> Fig 01 = mode-independent master (behind all four tabs) · Fig 02 = MODE 01 SCAN/SURVEILLANCE · Fig 03 = MODE 02 TARGET DETECT (cue-and-hold) + MODE 03 alert propagation · Fig 04 = MODE 03 TARGET LOCK/ALERT (full algorithm depth).</li>
+          <li><b>Manual mode has no source figure.</b> <span class="gapchip">⚠ M4 GAP</span> No PNG covers MODE 04 (MANUAL OPERATION) — only the console → C&amp;M path in Fig 01. The MODE 04 tab (Payload 2: 0x08 Override / 0x09 Manual, all commands through CCPU, no bypass, RS422 921 kbps / 10 ms gimbal cycle) is built from SRS/IRS + the dossiers above, not from a source figure.</li>
+          <li><b>Naming.</b> Source figure names (Data Flow / Surveillance / Alert / Locked) vs this document's 4-mode spec names (SCAN / DETECT / LOCK-ALERT / MANUAL) — the mapping is the bullet above, not a rename; both are retained as-is.</li>
+          <li><b>Shared elements across all four figures.</b> L3 Switch (TSN Enabled) is the sole CCPU ↔ station boundary; the Video Wall Controller is drawn outside the CCPU boundary (the CCPU ends at the Video Wall Controller Interface); Data Storage (Short &amp; Long term) is fed only via the Data Formatting &amp; Archiving module.</li>
+          <li><b>Figures carry no values.</b> No ports (5010/5020/5005), VLAN/PCP, stream IDs (0x01–0x09), STN IDs, or latency values are drawn in any figure — every numeric value in this document comes from the SRS/IRS/pipeline documents (module dossiers + timing summary below).</li>
+          <li><b>Discrepancy register (flagged, never resolved).</b> <span class="gapchip">⚠ M1</span> Fig 02 shows the tracklist <b>processed</b> vs the MODE 01 spec “received but not processed” (display-only) · <span class="gapchip">⚠ M2</span> Fig 03 collapses the live chain into a single “Cueing Algorithm for Tracking” box · <span class="gapchip">⚠ M3</span> Association &amp; Kinematic Derivation appear in <b>no</b> source figure (pipeline-doc steps, kept in dossiers) · <span class="gapchip">⚠ M4</span> no figure for MODE 04 Manual · <span class="gapchip">⚠ N</span> figure naming differs from the 4-mode spec naming. All five are source-document contradictions/gaps — intentionally left open, consistent with the timing-summary flags below.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         TIMING SUMMARY (preserved + per-mode chain-depth row)
+         ================================================================ -->
+    <div class="timing">
+      <h2>Timing — as stated in the Processing Pipeline document (worst case)</h2>
+      <table>
+        <tr><td>CPU chain (N-1): Kinematic 3 + Ranging 2 + Trajectory 3 + Reentry 2 + Cue 3 + Symbology 2</td><td>= 15 ms</td></tr>
+        <tr><td>Association (FR-PERF-014, before kinematic)</td><td class="warn">NOT BUDGETED (GAP)</td></tr>
+        <tr><td>Parallel: H.264 decode (NVDEC) 7 / video logging 2 / command control 3 (event)</td><td>= max 7 ms</td></tr>
+        <tr><td>CCPU worst case, recomputed = max(15, 7)</td><td>= 15 ms</td></tr>
+        <tr><td>CCPU total, <b>stated</b> (pipeline p2)</td><td class="warn">~18 ms — 3 ms unaccounted ⚠</td></tr>
+        <tr><td>Per-mode chain depth — the (N-1) sequential budget is only live in Modes 2-3: M2 5 of 8 steps (Assoc→Kin→Range→Traj→Cue) · M3 8 of 8 · M1 / M4 chain dormant. Per-mode budget value:</td><td class="warn">not stated in docs ⚠</td></tr>
+        <tr><td>Full pipeline: 13 SPU/MPU + 10 network RTT (500 km) + 18 CCPU + 0.4 gimbal</td><td>≈ 41.4 → ~40 ms (table) / ~50 ms (banner) ⚠</td></tr>
+        <tr><td>NFR-PERF-01 (SPU↔CCPU ≤ 32 ms) · NFR-PERF-02 (CCPU ≤ 50 ms) · NFR-PERF-04 (≤ 3 frames)</td><td class="warn">not met ⚠ · MET · MET (~2 frames, marginal)</td></tr>
+      </table>
+      <div class="note">Module layout per CCPU_Data_Flow.png; all timings are worst-case values exactly as stated in the documents — no re-estimates. Target Classification (in the PNG algorithm list) and the gimbal/RS422 egress (in SRS/IRS, not in the PNG) are both retained and flagged. “⚠ / GAP” items are contradictions or unspecified fields in the source documents (see CCPU_Workflow_Task_Derivation.md §7), not silently resolved. The per-mode activation rows above follow the mode spec; no per-mode timing values exist in the documents.</div>
+    </div>
+
+  </main>
+
+  <script>
+  // ============ mode switching (tabs + hazard banner + per-mode accent) ============
+  var tabBtns = document.querySelectorAll('.nav-tab-btn');
+  var tabSecs = document.querySelectorAll('.tab-section');
+
+  function setMode(m){
+    tabBtns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-mode') === String(m)); });
+    tabSecs.forEach(function(s){ s.classList.toggle('active', s.id === 'mode-'+m); });
+    document.body.className = document.body.className.replace(/mode-\d/g,'').trim();
+    document.body.classList.add('mode-'+m);
+  }
+  tabBtns.forEach(function(b){
+    b.addEventListener('click', function(){ setMode(b.getAttribute('data-mode')); });
+  });
+
+  // ============ pipeline activation views (same diagram, per-mode state) ============
+  var NODE_DEF = {
+    sel : {tag:'CCPU INGRESS', name:'IP Video/Data Stream Selection', sub:''},
+    gw  : {tag:'CCPU MODULE', name:'SMPTE 2110 Gateway', sub:'streams 0x03/0x04 · decode bypass → Wall'},
+    dec : {tag:'GPU · NVDEC · Nth', name:'Video Acquisition (Decode)', sub:'H.264 (0x01) / H.265 (0x02) · SRT · port 5020'},
+    dsp : {tag:'CPU · (N-1) · SEQ', name:'Data Stream Processing', sub:'0xAA/0xDC · STN ID · OSS/STN MODE · validity ≤1.25 ms'},
+    ts  : {tag:'PTP · DEDICATED CORE', name:'Timesync Module (PTP Server App)', sub:'IEEE 802.1AS · &lt;100 ns · continuous — ALL MODES'},
+    vwm : {tag:'CCPU MODULE', name:'Video Wall Interface', sub:'HDMI → VWC · frames → Data Mgmt (logging)'},
+    algo: {tag:'CPU · (N-1) · SEQ', name:'Algorithm Processing — 8-step chain', sub:''},
+    dmm : {tag:'FILE SYSTEM · REDUNDANT', name:'Data Management', sub:'SAN 10G · short &amp; long term'},
+    sym : {tag:'CPU + GPU · (N-1)', name:'Symbology &amp; Overlay Generation', sub:''},
+    cm  : {tag:'CPU · EVENT', name:'Control &amp; Management (+ Operations)', sub:'Payload 2 · C&amp;C · HDMI'},
+    vwc : {tag:'EXTERNAL · HDMI HUB', name:'Video Wall Controller → Video Wall', sub:'HDMI → Wall · Console · GIS (+ 2110 GW bypass)'},
+    cc  : {tag:'EXTERNAL · 10G → RS422', name:'C&amp;C Route → Gimbal', sub:'L3 Switch → MPU → SPU · 921 kbps · 10 ms cycle'},
+    sto : {tag:'EXTERNAL · 10G', name:'Data Storage (SAN) → GIS Interface', sub:'SFP/SFP+ · NFR-REL-02 · 10G'}
+  };
+  var SYM_SUB = {
+    1:'base symbology: view labels · status · crosshair · time/UTC',
+    2:'+ track-box / target symbology on the wall',
+    3:'+ urgent / colored alert symbology state',
+    4:''
+  };
+  var ALGO_SUB = {
+    1:'DORMANT — no association · no ranging · no cueing',
+    2:'5 of 8 steps live — partial chain (1-4 + 7)',
+    3:'8 of 8 steps live — every frame',
+    4:'DORMANT — operator is the targeting brain'
+  };
+  var STATE = {
+    1:{sel:'A',gw:'A',dec:'A',ts:'A',vwm:'A',algo:'D',dmm:'NS',sym:'A',cm:'NS',vwc:'A',cc:'D',sto:'NS'},
+    2:{sel:'A',gw:'A',dec:'A',ts:'A',vwm:'A',algo:'A',dmm:'NS',sym:'A',cm:'A',vwc:'A',cc:'A',sto:'NS'},
+    3:{sel:'A',gw:'A',dec:'A',ts:'A',vwm:'A',algo:'A',dmm:'A',sym:'A',cm:'A',vwc:'A',cc:'A',sto:'A'},
+    4:{sel:'A',gw:'A',dec:'A',ts:'A',vwm:'A',algo:'D',dmm:'NS',sym:'NS',cm:'A',vwc:'A',cc:'A',sto:'NS'}
+  };
+  var LIT = {1:[],2:[1,2,3,4,7],3:[1,2,3,4,5,6,7,8],4:[]};
+  var GAPSTEPS = [1,6,8];
+
+  function nodeHTML(m, id){
+    var s = STATE[m][id], d = NODE_DEF[id];
+    var cls = (s==='A') ? 'on' : (s==='D') ? 'off' : 'ns';
+    var stat = (s==='A') ? 'ACTIVE' : (s==='D') ? 'DORMANT IN THIS MODE' : '⚠ NOT STATED';
+    var sub = d.sub;
+    if (id==='sym') sub = SYM_SUB[m];
+    if (id==='algo') sub = ALGO_SUB[m];
+    var dots = '';
+    if (id==='algo'){
+      dots = '<div class="pdots">';
+      for (var i=1; i<=8; i++){
+        var on = LIT[m].indexOf(i) >= 0;
+        var g = GAPSTEPS.indexOf(i) >= 0 ? ' gapst' : '';
+        dots += '<span class="pdot '+(on?'on':'off')+g+'" title="chain step '+i+'">'+i+'</span>';
+      }
+      dots += '</div>';
+    }
+    return '<div class="pnode '+cls+'"><span class="pstat">'+stat+'</span><div class="ptag">'+d.tag+'</div><div class="pname">'+d.name+'</div>'+
+           (sub ? '<div class="psub">'+sub+'</div>' : '') + dots + '</div>';
+  }
+  function dropHTML(label, live){
+    var ar = live ? '▼' : '┄┄';
+    return '<div class="pdrop '+(live?'live':'dim')+'"><span class="ar">'+ar+'</span>'+
+           (label ? '<span class="dl">'+label+'</span>' : '') + '</div>';
+  }
+  function renderPipe(m){
+    var S = STATE[m];
+    function live(a, b){ return S[a]==='A' && (!b || S[b]==='A'); }
+    var h = '';
+    h += '<div class="pipe-src">' +
+         '<div class="pipe-srcbox"><b>L3 SWITCH (TSN)</b> — 3 STNs · 10G SFP/SFP+ · video port 5020 (SRT · 25 streams) · tracklist port 5010 (0xAA/0xDC) · Az/El + CUE port 5005 · VLAN20/30/35 · PCP4 · 802.1Qbv <span class="always">— BASE INFRA, ALL MODES</span></div>' +
+         '<div class="pipe-srcbox"><b>PTP GRANDMASTER</b> — GM 10.0.0.10 · IEEE 802.1AS · &lt;100 ns · 1G ETH <span class="always">— ALL MODES</span></div>' +
+         '</div>';
+    h += '<div class="pdropgrid"><div class="pdrop live" style="grid-column:1/5"><span class="ar">▼</span><span class="dl">Comp. + Uncomp. Video IP Stream (10G) · Data Stream (tracklist 5010) · Timesync Data</span></div></div>';
+    h += '<div class="pgrid wide">' + nodeHTML(m,'sel') + '</div>';
+    h += '<div class="pdropgrid">' + dropHTML('Uncomp. Video Stream', live('sel','gw')) + dropHTML('Comp. Video Stream', live('sel','dec')) + dropHTML('Data Stream', live('sel','dsp')) + dropHTML('Timesync Data', live('sel','ts')) + '</div>';
+    h += '<div class="pgrid">' + nodeHTML(m,'gw') + nodeHTML(m,'dec') + nodeHTML(m,'dsp') + nodeHTML(m,'ts') + '</div>';
+    h += '<div class="pdropgrid">' + dropHTML('', false) + dropHTML('Decoded Video Frames', live('dec','vwm')) + dropHTML('Validated Data Stream', live('dsp','algo')) + dropHTML('', false) + '</div>';
+    h += '<div class="pgrid"><div></div>' + nodeHTML(m,'vwm') + nodeHTML(m,'algo') + nodeHTML(m,'dmm') + '</div>';
+    h += '<div class="pdropgrid">' + dropHTML('', false) + dropHTML('Processed Data', live('algo','sym')) + dropHTML('CUE 0x05 · port 5005 · Logs', live('algo','cm')) + dropHTML('', false) + '</div>';
+    h += '<div class="pgrid"><div></div>' + nodeHTML(m,'sym') + nodeHTML(m,'cm') + '<div></div></div>';
+    h += '<div class="pdropgrid">' + dropHTML('', false) + dropHTML('HDMI — VWM · Symbology · C&amp;M (+ 2110 GW bypass)', live('vwm','vwc')) + dropHTML('Control · Payload 2 + CUE → L3 → MPU → SPU', live('cm','cc')) + dropHTML('Processed Data · Logs · Video (10G)', live('dmm','sto')) + '</div>';
+    h += '<div class="pgrid"><div></div>' + nodeHTML(m,'vwc') + nodeHTML(m,'cc') + nodeHTML(m,'sto') + '</div>';
+    h += '<div class="pipe-cap">Same module topology in all four modes — only activation differs (per mode spec). ◌ grayed / dashed = dormant in this mode · ┄┄ = broken/dimmed link · ⚠ dashed red = state not stated in the mode spec. Full IN → PROCESS → OUT → REF / GAP content per module: see the CCPU module dossiers below.</div>';
+    return h;
+  }
+  [1,2,3,4].forEach(function(m){
+    document.getElementById('pipe-'+m).innerHTML = renderPipe(m);
+  });
+
+  // ============ click-to-expand: dossier blocks ============
+  document.querySelectorAll('.block.has-detail').forEach(function(el){
+    el.addEventListener('click', function(){ el.classList.toggle('open'); });
+  });
+
+  // ============ click-to-expand: algorithm step chips (one detail card at a time) ============
+  var steps = document.querySelectorAll('#algoMini .step');
+  var panels = document.querySelectorAll('.adetail');
+  steps.forEach(function(s){
+    s.addEventListener('click', function(e){
+      e.stopPropagation();
+      var d = document.getElementById(s.dataset.detail);
+      var wasOpen = (d.style.display === 'block');
+      panels.forEach(function(p){ p.style.display = 'none'; });
+      steps.forEach(function(x){ x.classList.remove('sel'); });
+      if(!wasOpen){ d.style.display = 'block'; s.classList.add('sel'); }
+    });
+  });
+
+  // ============ full algorithm data-flow toggle ============
+  var flowBtn = document.getElementById('flowBtn'), algoFlow = document.getElementById('algoFlow');
+  flowBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    var open = algoFlow.style.display !== 'none';
+    algoFlow.style.display = open ? 'none' : 'block';
+    flowBtn.textContent = open ? '▸ show full algorithm data flow' : '▾ hide full algorithm data flow';
+  });
+
+  // ============ click-to-expand: HOW sub-steps inside data-flow cards ============
+  document.querySelectorAll('#algoFlow .fcard.has-how').forEach(function(card){
+    card.addEventListener('click', function(){
+      var open = card.classList.toggle('howopen');
+      var h = card.querySelector('.hhint');
+      if (h) h.textContent = open ? '▾ click to hide HOW steps' : '▸ click for HOW steps';
+    });
+  });
+
+  // ============ timing values: hidden by default ============
+  var timingBtn = document.getElementById('timingBtn');
+  timingBtn.addEventListener('click', function(){
+    var hidden = document.body.classList.toggle('hidetiming');
+    timingBtn.textContent = hidden
+      ? '▸ show timing values (doc-stated worst case — actual HW latency unverified)'
+      : '▾ hide timing values';
+  });
+
+  </script>
+
+</body>
+</html>
