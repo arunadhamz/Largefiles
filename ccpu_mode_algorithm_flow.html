@@ -1,0 +1,2706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCPU // Mode-Based Algorithm Flow &amp; OSS Data Path Architecture</title>
+  <style>
+    :root {
+      /* High-Precision Executive White Palette */
+      --bg-base: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-card: #ffffff;
+      --border-subtle: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --border-dark: #94a3b8;
+
+      --text-main: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --text-faint: #94a3b8;
+
+      /* 4 Mode Accent Colors + Tab 5 Accent */
+      --m1-color: #0284c7;
+      --m1-light: #f0f9ff;
+      --m1-border: #bae6fd;
+      --m1-glow: rgba(2, 132, 199, 0.22);
+
+      --m2-color: #ea580c;
+      --m2-light: #fff7ed;
+      --m2-border: #fed7aa;
+      --m2-glow: rgba(234, 88, 12, 0.25);
+
+      --m3-color: #dc2626;
+      --m3-light: #fef2f2;
+      --m3-border: #fecaca;
+      --m3-glow: rgba(220, 38, 38, 0.30);
+
+      --m4-color: #059669;
+      --m4-light: #f0fdf4;
+      --m4-border: #bbf7d0;
+      --m4-glow: rgba(5, 150, 105, 0.22);
+
+      --m5-color: #4f46e5;
+      --m5-light: #eef2ff;
+      --m5-border: #c7d2fe;
+      --m5-glow: rgba(79, 70, 229, 0.22);
+
+      /* Status Colors */
+      --status-working: #16a34a;
+      --status-working-bg: #f0fdf4;
+      --status-working-border: #bbf7d0;
+
+      --status-dormant: #dc2626;
+      --status-dormant-bg: #fef2f2;
+      --status-dormant-border: #fecaca;
+
+      --status-gap: #d97706;
+      --status-gap-bg: #fffbeb;
+      --status-gap-border: #fde68a;
+
+      /* Pipeline Technical Accents */
+      --seq: #d97706;
+      --par: #4f46e5;
+      --gpu: #0891b2;
+      --gap: #dc2626;
+      --out: #7c3aed;
+      --mod: #16a34a;
+
+      --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 14px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+      --shadow-lg: 0 12px 28px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+
+      --r-sm: 4px;
+      --r-md: 8px;
+      --r-lg: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      line-height: 1.5;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 80px;
+    }
+
+    /* Executive Top Masthead */
+    .masthead {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 16px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .masthead-brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-emblem {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      border-radius: var(--r-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -0.5px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+      border: 1px solid #334155;
+    }
+
+    .brand-text h1 {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-text h1 span.badge-sub {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding: 3px 8px;
+      background: #f1f5f9;
+      color: #475569;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-subtle);
+      letter-spacing: 0.5px;
+    }
+
+    .brand-text p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .masthead-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-strong);
+      background: #fff;
+      color: var(--text-main);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: #f8fafc;
+      border-color: var(--text-muted);
+    }
+
+    /* Sticky Mode Navigation Tabs (5 Tabs) */
+    .mode-nav-tabs {
+      background: var(--bg-surface);
+      border-bottom: 2px solid var(--border-subtle);
+      padding: 10px 28px 0;
+      display: flex;
+      gap: 8px;
+      position: sticky;
+      top: 77px;
+      z-index: 90;
+      overflow-x: auto;
+    }
+
+    .nav-tab-btn {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 12px 18px;
+      border-radius: var(--r-md) var(--r-md) 0 0;
+      border: 1px solid var(--border-subtle);
+      border-bottom: none;
+      background: #f1f5f9;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      bottom: -2px;
+      white-space: nowrap;
+    }
+
+    .nav-tab-btn:hover {
+      background: #e2e8f0;
+      color: var(--text-main);
+    }
+
+    .nav-tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: var(--r-sm);
+      background: #e2e8f0;
+      color: var(--text-body);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .nav-tab-btn.active {
+      background: var(--bg-surface);
+      border-bottom: 2px solid var(--bg-surface);
+      font-weight: 800;
+      box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.04);
+    }
+
+    .nav-tab-btn[data-mode="1"].active {
+      border-color: var(--m1-border);
+      border-top: 3px solid var(--m1-color);
+      color: var(--m1-color);
+    }
+    .nav-tab-btn[data-mode="1"].active .nav-tab-badge { background: var(--m1-color); color: #fff; }
+
+    .nav-tab-btn[data-mode="2"].active {
+      border-color: var(--m2-border);
+      border-top: 3px solid var(--m2-color);
+      color: var(--m2-color);
+    }
+    .nav-tab-btn[data-mode="2"].active .nav-tab-badge { background: var(--m2-color); color: #fff; }
+
+    .nav-tab-btn[data-mode="3"].active {
+      border-color: var(--m3-border);
+      border-top: 3px solid var(--m3-color);
+      color: var(--m3-color);
+    }
+    .nav-tab-btn[data-mode="3"].active .nav-tab-badge { background: var(--m3-color); color: #fff; }
+
+    .nav-tab-btn[data-mode="4"].active {
+      border-color: var(--m4-border);
+      border-top: 3px solid var(--m4-color);
+      color: var(--m4-color);
+    }
+    .nav-tab-btn[data-mode="4"].active .nav-tab-badge { background: var(--m4-color); color: #fff; }
+
+    .nav-tab-btn[data-mode="5"].active {
+      border-color: var(--m5-border);
+      border-top: 3px solid var(--m5-color);
+      color: var(--m5-color);
+    }
+    .nav-tab-btn[data-mode="5"].active .nav-tab-badge { background: var(--m5-color); color: #fff; }
+
+    /* Sticky Mode 03 Threat Alert Bar */
+    .hazard-banner {
+      display: none;
+      background: #b91c1c;
+      color: #ffffff;
+      padding: 9px 28px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      box-shadow: 0 4px 14px rgba(185, 28, 28, 0.4);
+      animation: alertPulse 2s infinite ease-in-out;
+    }
+
+    @keyframes alertPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+
+    body.mode-3-active .hazard-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Viewport Layout */
+    .viewport-container {
+      max-width: 1560px;
+      margin: 24px auto 0;
+      padding: 0 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* Universal Tactical Cards */
+    .tactical-frame {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .tactical-frame:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-strong);
+    }
+
+    .card-header-bar {
+      padding: 16px 22px;
+      background: #fafcfd;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title-icon {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--m1-color);
+    }
+
+    .card-subtext {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* Mode Summary & 4 Exact User-Requested Telemetry KPI Tiles */
+    .mode-summary-card {
+      padding: 22px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+      border-left: 6px solid var(--m1-color);
+    }
+
+    .mode-title-wrap h2 {
+      font-size: 21px;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mode-title-wrap p {
+      font-size: 13px;
+      color: var(--text-body);
+      margin-top: 6px;
+      line-height: 1.6;
+    }
+
+    /* Master Vector SVG Topology Schematic */
+    .topology-container {
+      padding: 24px;
+      background: #ffffff;
+    }
+
+    .svg-schematic-wrap {
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: 16px;
+      overflow-x: auto;
+    }
+
+    .schematic-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-width: 960px;
+    }
+
+    @keyframes flowDash {
+      to { stroke-dashoffset: -28; }
+    }
+
+    .flow-path-active {
+      stroke-dasharray: 8 6;
+      animation: flowDash 0.85s linear infinite;
+    }
+
+    .flow-path-dormant {
+      stroke-dasharray: 4 4;
+      opacity: 0.45;
+    }
+
+    /* WORKING VS NOT WORKING MODULE ACTIVATION GRID */
+    .module-activation-card {
+      padding: 24px;
+      background: #ffffff;
+    }
+
+    .module-act-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .module-act-header h3 {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .module-act-stats {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      display: flex;
+      gap: 14px;
+    }
+
+    .stat-pill {
+      padding: 4px 10px;
+      border-radius: var(--r-sm);
+      font-weight: 700;
+    }
+
+    .stat-pill.working {
+      background: var(--status-working-bg);
+      color: var(--status-working);
+      border: 1px solid var(--status-working-border);
+    }
+
+    .stat-pill.dormant {
+      background: var(--status-dormant-bg);
+      color: var(--status-dormant);
+      border: 1px solid var(--status-dormant-border);
+    }
+
+    .stat-pill.gap {
+      background: var(--status-gap-bg);
+      color: var(--status-gap);
+      border: 1px solid var(--status-gap-border);
+    }
+
+    .module-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+
+    .mod-status-box {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .mod-status-box.state-working {
+      border-left: 4px solid var(--status-working);
+      box-shadow: 0 2px 8px rgba(22, 163, 74, 0.06);
+    }
+
+    .mod-status-box.state-dormant {
+      border-left: 4px solid var(--status-dormant);
+      background: #fafaf9;
+      opacity: 0.88;
+    }
+
+    .mod-status-box.state-gap {
+      border-left: 4px solid var(--status-gap);
+    }
+
+    .mod-status-box:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      opacity: 1;
+    }
+
+    .mod-box-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    .mod-box-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .mod-badge-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: var(--r-sm);
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .mod-badge-pill.working {
+      background: var(--status-working-bg);
+      color: var(--status-working);
+      border: 1px solid var(--status-working-border);
+    }
+
+    .mod-badge-pill.dormant {
+      background: var(--status-dormant-bg);
+      color: var(--status-dormant);
+      border: 1px solid var(--status-dormant-border);
+    }
+
+    .mod-badge-pill.gap {
+      background: var(--status-gap-bg);
+      color: var(--status-gap);
+      border: 1px solid var(--status-gap-border);
+    }
+
+    .mod-box-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .mod-box-desc {
+      font-size: 12px;
+      color: var(--text-body);
+      line-height: 1.5;
+      margin-bottom: 12px;
+      flex-grow: 1;
+    }
+
+    .mod-box-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border-subtle);
+    }
+
+    .mod-btn-jump {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: #4f46e5;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      padding: 4px 10px;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+
+    .mod-btn-jump:hover {
+      background: #4f46e5;
+      color: #ffffff;
+    }
+
+    /* 8-STEP ALGORITHM SUITE */
+    .algo-suite-container {
+      padding: 24px;
+      background: #ffffff;
+    }
+
+    .algo-chain-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .algo-step-node {
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      min-height: 96px;
+    }
+
+    .algo-step-node:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+      border-color: var(--border-strong);
+    }
+
+    .algo-step-node.active-step {
+      background: var(--m-light, #f0fdf4);
+      border-color: var(--m-accent, #16a34a);
+      box-shadow: 0 2px 8px var(--m-glow, rgba(22, 163, 74, 0.15));
+    }
+
+    .algo-step-node.dormant-step {
+      opacity: 0.55;
+      background: #f1f5f9;
+      filter: grayscale(40%);
+    }
+
+    .algo-step-node.selected-step {
+      outline: 2px solid #0f172a;
+      outline-offset: 2px;
+    }
+
+    .step-num-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .step-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 6px 0 2px;
+      line-height: 1.3;
+    }
+
+    .step-latency {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Inspector Box */
+    .algo-inspector-box {
+      background: #fafcfd;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-md);
+      padding: 22px 24px;
+    }
+
+    .inspector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .inspector-step-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .inspector-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .dossier-card {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: 16px;
+    }
+
+    .dossier-card-title {
+      font-size: 11px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dossier-body {
+      font-size: 13px;
+      color: var(--text-body);
+      line-height: 1.6;
+    }
+
+    .code-block-embed {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 10px 12px;
+      border-radius: var(--r-sm);
+      margin-top: 10px;
+      overflow-x: auto;
+      line-height: 1.4;
+    }
+
+    /* 4-MODE COMPARISON MATRIX TABLE */
+    .matrix-card-wrap {
+      padding: 24px;
+      background: #ffffff;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 14px;
+    }
+
+    .comparison-table th, .comparison-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .comparison-table th {
+      background: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .comparison-table tr:hover td {
+      background: #fafcfd;
+    }
+
+    .st-active { font-family: var(--font-mono); font-weight: 800; color: #16a34a; }
+    .st-dormant { font-family: var(--font-mono); font-weight: 600; color: #94a3b8; }
+    .st-cont { font-family: var(--font-mono); font-weight: 800; color: #ea580c; }
+    .st-high { font-family: var(--font-mono); font-weight: 800; color: #dc2626; }
+
+    /* =========================================================
+       TAB 05: FULL DATA FLOW PER MODULE SUITE (DEDICATED VIEW)
+       ========================================================= */
+    #moduleFlowView {
+      display: none;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .flow-hero-banner {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      color: #ffffff;
+      padding: 28px 32px;
+      border-radius: var(--r-lg);
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .flow-hero-banner h2 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .flow-hero-banner p {
+      font-size: 13px;
+      color: #c7d2fe;
+      margin-top: 8px;
+      max-width: 960px;
+      line-height: 1.6;
+    }
+
+    /* Filter Controls Ribbon on Tab 5 */
+    .flow-filter-ribbon {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .filter-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .filter-btn-pill {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border-subtle);
+      background: #f8fafc;
+      color: var(--text-body);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .filter-btn-pill:hover {
+      background: #e2e8f0;
+    }
+
+    .filter-btn-pill.active {
+      background: #4f46e5;
+      color: #ffffff;
+      border-color: #4f46e5;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+    }
+
+    /* Detailed Dossier Grid (Tab 5) */
+    .master-dossier-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .master-dossier-card {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+
+    .master-dossier-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-strong);
+    }
+
+    .dossier-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .dossier-id-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .dossier-num-badge {
+      width: 34px;
+      height: 34px;
+      background: #0f172a;
+      color: #ffffff;
+      border-radius: var(--r-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .dossier-title-box h3 {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .dossier-title-box p {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .mode-matrix-pills {
+      display: flex;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .m-pill {
+      padding: 4px 8px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-subtle);
+      background: #f8fafc;
+      color: var(--text-muted);
+    }
+
+    .m-pill.is-on {
+      background: #f0fdf4;
+      color: #16a34a;
+      border-color: #bbf7d0;
+    }
+
+    .m-pill.is-off {
+      background: #fef2f2;
+      color: #dc2626;
+      border-color: #fecaca;
+    }
+
+    .m-pill.is-gap {
+      background: #fffbeb;
+      color: #d97706;
+      border-color: #fde68a;
+    }
+
+    /* 4-Box Flow Layout (IN -> PROCESS -> OUT -> REF) */
+    .flow-quad-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .flow-quad-box {
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .flow-quad-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .box-in .flow-quad-title { color: #0284c7; }
+    .box-proc .flow-quad-title { color: #d97706; }
+    .box-out .flow-quad-title { color: #16a34a; }
+    .box-ref .flow-quad-title { color: #7c3aed; }
+
+    .flow-quad-body {
+      font-size: 12px;
+      color: var(--text-body);
+      line-height: 1.55;
+      flex-grow: 1;
+    }
+
+    .dossier-code-toggle {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: #4f46e5;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 0;
+    }
+
+    .dossier-code-drawer {
+      display: none;
+      margin-top: 10px;
+      background: #0f172a;
+      border-radius: var(--r-md);
+      padding: 14px 18px;
+      color: #e2e8f0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-x: auto;
+    }
+
+    /* =========================================================
+       TIMING WATERFALL SECTION AT THE VERY END (SEPARATED)
+       ========================================================= */
+    .timing-section-wrap {
+      margin-top: 20px;
+      padding: 28px;
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-lg);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .timing-header-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 22px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border-subtle);
+    }
+
+    .timing-headline h2 {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .timing-subline {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .waterfall-card {
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .waterfall-bar-row {
+      display: flex;
+      align-items: center;
+      margin: 12px 0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .wf-label {
+      width: 240px;
+      font-weight: 700;
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+
+    .wf-track {
+      flex: 1;
+      height: 24px;
+      background: #e2e8f0;
+      border-radius: var(--r-sm);
+      overflow: hidden;
+      display: flex;
+      position: relative;
+    }
+
+    .wf-seg {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 11px;
+      white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      transition: width 0.3s ease;
+    }
+
+    .wf-time {
+      width: 90px;
+      text-align: right;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    /* Executive Footer */
+    .tactical-footer {
+      max-width: 1560px;
+      margin: 40px auto 0;
+      padding: 24px 28px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-family: var(--font-mono);
+    }
+
+    /* Sticky Masthead Active Mode Indicator Pill */
+    .active-mode-pill {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 7px 14px;
+      border-radius: 20px;
+      border: 1.5px solid var(--m1-border);
+      background: var(--m1-light);
+      color: var(--m1-color);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 0.3px;
+      transition: all 0.2s ease;
+    }
+
+    /* Floating Mode Switch Toast Notification */
+    .mode-switch-toast {
+      position: fixed;
+      top: 146px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-12px);
+      z-index: 999;
+      background: #0f172a;
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 12px 24px;
+      border-radius: 30px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
+      border: 2px solid #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    .mode-switch-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @keyframes modePulseHighlight {
+      0% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.45); }
+      70% { box-shadow: 0 0 0 10px rgba(2, 132, 199, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
+    }
+
+    .mode-flash {
+      animation: modePulseHighlight 0.85s ease-out;
+    }
+  </style>
+</head>
+<body class="mode-1">
+
+  <!-- Masthead -->
+  <header class="masthead">
+    <div class="masthead-brand">
+      <div class="brand-emblem">CCPU</div>
+      <div class="brand-text">
+        <h1>CCPU Algorithm Flow <span class="badge-sub">OSS · CCPU MK-VII</span></h1>
+        <p>Optical Surveillance System · Integrated 8-Step Tracking &amp; Multi-Mode Full Data Flow</p>
+      </div>
+    </div>
+    <div class="masthead-controls">
+      <div class="active-mode-pill" id="mastheadModePill">
+        <span>●</span> <span>MODE 01 — SCAN / SURVEILLANCE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Floating Mode Switch Confirmation Toast -->
+  <div class="mode-switch-toast" id="modeSwitchToast"></div>
+
+  <!-- Sticky 5-Tab Navigation Bar -->
+  <nav class="mode-nav-tabs">
+    <button class="nav-tab-btn active" data-mode="1">
+      <span class="nav-tab-badge">01</span>
+      <span>SURVEILLANCE</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="2">
+      <span class="nav-tab-badge">02</span>
+      <span>TARGET DETECT</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="3">
+      <span class="nav-tab-badge">03</span>
+      <span>LOCK / MISSILE / ALERT</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="4">
+      <span class="nav-tab-badge">04</span>
+      <span>MANUAL OPERATION</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="5" id="navTabBtn5">
+      <span class="nav-tab-badge">05</span>
+      <span>FULL DATA FLOW (PER MODULE)</span>
+    </button>
+  </nav>
+
+  <!-- Mode 03 Sticky Threat Warning Banner -->
+  <div class="hazard-banner" id="hazardBanner">
+    <span>🚨 THREAT LEVEL 1 // HIGH ALERT — BALLISTIC INTERCEPT CHAIN FULLY ENGAGED (8/8 STEPS)</span>
+    <span>PTP SYNC: LOCKED (&lt;100 ns) · HIGH-RATE GIMBAL CUE: 10 ms ACTIVE</span>
+  </div>
+
+  <!-- Main Viewport -->
+  <main class="viewport-container">
+
+    <!-- =========================================================
+         STANDARD MODE VIEW (Modes 01 - 04)
+         ========================================================= -->
+    <div id="modeStandardView" style="display: flex; flex-direction: column; gap: 28px;">
+
+      <!-- Mode Summary -->
+      <div class="mode-summary-card tactical-frame" id="modeSummaryCard">
+        <div class="mode-title-wrap">
+          <h2 id="modeSummaryTitle"><span>●</span> MODE 01 — SCAN / SURVEILLANCE</h2>
+          <p id="modeSummaryDesc">
+            Stations run autonomous search/scan; no confirmed central track. CCPU job is display-only with composite HUD overlays on station video feeds. Algorithm chain is dormant.
+          </p>
+        </div>
+      </div>
+
+      <!-- Master Topology Diagram (Animated Vector SVG) -->
+      <div class="tactical-frame topology-container" id="topologyCard">
+        <div class="card-header-bar" style="margin: -24px -24px 20px -24px;">
+          <div class="card-title">
+            <span class="card-title-icon" id="topoTitleIcon"></span>
+            CCPU SYSTEM TOPOLOGY &amp; ACTIVE DATA PATH SCHEMATIC
+          </div>
+        </div>
+
+        <div class="svg-schematic-wrap">
+          <svg class="schematic-svg" viewBox="0 0 1140 360" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="gridPattern" width="20" height="20" patternUnits="userSpaceOnUse">
+                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5"/>
+              </pattern>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 8 5 L 0 9 z" fill="#94a3b8" />
+              </marker>
+              <marker id="arrowActive" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 8 5 L 0 9 z" fill="#0284c7" />
+              </marker>
+            </defs>
+
+            <!-- Grid Background -->
+            <rect width="1140" height="360" fill="url(#gridPattern)" />
+
+            <!-- SENSOR STATIONS 1, 2, 3 -->
+            <g id="stnGroup">
+              <rect x="20" y="30" width="160" height="82" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="32" y="65" font-family="monospace" font-size="11" font-weight="bold" fill="#0f172a">SENSOR STATION 1</text>
+              <text x="32" y="85" font-family="monospace" font-size="9.5" fill="#0284c7">SPU + MPU</text>
+
+              <rect x="20" y="138" width="160" height="82" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="32" y="173" font-family="monospace" font-size="11" font-weight="bold" fill="#0f172a">SENSOR STATION 2</text>
+              <text x="32" y="193" font-family="monospace" font-size="9.5" fill="#0284c7">SPU + MPU</text>
+
+              <rect x="20" y="246" width="160" height="82" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="32" y="281" font-family="monospace" font-size="11" font-weight="bold" fill="#0f172a">SENSOR STATION 3</text>
+              <text x="32" y="301" font-family="monospace" font-size="9.5" fill="#0284c7">SPU + MPU</text>
+            </g>
+
+            <!-- L3 TSN SWITCH -->
+            <g id="l3Switch">
+              <rect x="240" y="65" width="110" height="240" rx="8" fill="#ffffff" stroke="#0f172a" stroke-width="2"/>
+              <text x="255" y="165" font-family="monospace" font-size="12" font-weight="bold" fill="#0f172a">L3 TSN</text>
+              <text x="255" y="183" font-family="monospace" font-size="12" font-weight="bold" fill="#0f172a">SWITCH</text>
+              <text x="252" y="205" font-family="sans-serif" font-size="9" fill="#64748b">802.1Qbv</text>
+              <text x="252" y="220" font-family="sans-serif" font-size="9" fill="#64748b">10G SFP+</text>
+            </g>
+
+            <!-- PTP GRANDMASTER -->
+            <g id="ptpMaster">
+              <rect x="240" y="14" width="110" height="36" rx="4" fill="#f8fafc" stroke="#64748b" stroke-width="1"/>
+              <text x="250" y="30" font-family="monospace" font-size="9" font-weight="bold" fill="#0f172a">PTP GM 10.0.0.10</text>
+              <text x="250" y="42" font-family="sans-serif" font-size="8" fill="#16a34a">Clock Sync &lt;100ns</text>
+            </g>
+
+            <!-- CCPU HARDWARE BOUNDARY -->
+            <rect x="410" y="18" width="450" height="324" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4"/>
+            <text x="425" y="39" font-family="monospace" font-size="12" font-weight="800" fill="#0f172a">CCPU</text>
+
+            <!-- Left Column inside CCPU -->
+            <!-- CCPU Ingest / Selection -->
+            <g id="nodeSel">
+              <rect x="430" y="55" width="180" height="52" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="442" y="85" font-family="monospace" font-size="10" font-weight="bold" fill="#0f172a">Stream Demux (Ingress)</text>
+            </g>
+
+            <!-- CCPU NVDEC GPU Decoder -->
+            <g id="nodeDec">
+              <rect x="430" y="135" width="180" height="52" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="442" y="156" font-family="monospace" font-size="10" font-weight="bold" fill="#0f172a">Video Decode (NVDEC)</text>
+              <text x="442" y="173" font-family="sans-serif" font-size="8.5" fill="#0891b2">Nth Frame GPU (~7 ms)</text>
+            </g>
+
+            <!-- CCPU Data Stream Processing (DSP) -->
+            <g id="nodeDsp">
+              <rect x="430" y="215" width="180" height="52" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="442" y="236" font-family="monospace" font-size="10" font-weight="bold" fill="#0f172a">Data Stream Processing</text>
+              <text x="442" y="253" font-family="sans-serif" font-size="8.5" fill="#d97706">Validation Check (N-1)th</text>
+            </g>
+
+            <!-- Right Column inside CCPU (Video Wall Interface top, Algorithm Engine + Control & Management together below) -->
+            <!-- CCPU Video Wall Interface -->
+            <g id="nodeVwm">
+              <rect x="660" y="55" width="180" height="52" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="672" y="76" font-family="monospace" font-size="10" font-weight="bold" fill="#0f172a">Video Wall Interface</text>
+              <text x="672" y="93" font-family="sans-serif" font-size="8.5" fill="#64748b">Symbology + Video HDMI</text>
+            </g>
+
+            <!-- CCPU Algorithm Processing Module (8-Step Chain) -->
+            <g id="nodeAlgo">
+              <rect x="660" y="155" width="180" height="66" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="672" y="177" font-family="monospace" font-size="10" font-weight="bold" fill="#0f172a">Algorithm Engine</text>
+              <text x="672" y="193" font-family="sans-serif" font-size="8.5" fill="#4f46e5">8-Step Sequential Chain</text>
+              <text x="672" y="210" font-family="monospace" font-size="8" fill="#16a34a">CUE Stream 0x05 · Port 5005</text>
+            </g>
+
+            <!-- CCPU Control & Management (Moved directly near Algorithm Engine) -->
+            <g id="nodeCm">
+              <rect x="660" y="248" width="180" height="52" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+              <text x="672" y="269" font-family="monospace" font-size="10" font-weight="bold" fill="#0f172a">Control &amp; Management</text>
+              <text x="672" y="286" font-family="sans-serif" font-size="8.5" fill="#7c3aed">C&amp;C Egress · Payload 2</text>
+            </g>
+
+            <!-- DOWNSTREAM OUTPUT CONSUMERS -->
+            <!-- Video Wall -->
+            <g id="nodeWall">
+              <rect x="920" y="45" width="180" height="75" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.8"/>
+              <text x="935" y="70" font-family="monospace" font-size="11" font-weight="bold" fill="#0f172a">VIDEO WALL</text>
+              <text x="935" y="88" font-family="sans-serif" font-size="9" fill="#64748b">Operator Multi-Display</text>
+              <text x="935" y="106" font-family="monospace" font-size="8.5" fill="#16a34a">HDMI · Decoded + Symbology</text>
+            </g>
+
+            <!-- Station Gimbal Return Path -->
+            <g id="nodeGimbal">
+              <rect x="920" y="232" width="180" height="85" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.8"/>
+              <text x="935" y="278" font-family="monospace" font-size="11" font-weight="bold" fill="#0f172a">GIMBAL CONTROLLER</text>
+            </g>
+
+            <!-- ANIMATED CONNECTING BUS LINES -->
+            <path id="pathStn1" d="M 180 71 L 240 105" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+            <path id="pathStn2" d="M 180 179 L 240 179" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+            <path id="pathStn3" d="M 180 287 L 240 255" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+
+            <path id="pathDemux" d="M 350 100 L 430 81" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+            <path id="pathDec" d="M 520 107 L 520 135" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+            <path id="pathVwm" d="M 610 161 L 660 81" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+
+            <path id="pathDsp" d="M 350 235 L 430 241" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+            <path id="pathAlgo" d="M 610 241 L 660 188" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+            <path id="pathAlgoSym" d="M 750 155 L 750 107" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+            <path id="pathAlgoCm" d="M 750 221 L 750 248" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowActive)"/>
+
+            <path id="pathWall" d="M 840 81 L 920 81" stroke="#94a3b8" stroke-width="2.2" fill="none" marker-end="url(#arrowActive)"/>
+            <path id="pathGimbal" d="M 840 274 L 920 274" stroke="#94a3b8" stroke-width="2.2" fill="none" marker-end="url(#arrowActive)"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           MODULE ARCHITECTURE OVERVIEW IN THIS MODE
+           ========================================================= -->
+      <div class="tactical-frame module-activation-card" id="modeModuleActivationCard">
+        <div class="module-act-header">
+          <div>
+            <h3 id="modeActHeading">● MODULE ARCHITECTURE IN MODE 01</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              Core CCPU modules and peripheral controllers for this operational state.
+            </p>
+          </div>
+        </div>
+
+        <!-- Dynamic Grid of 12 Module Cards -->
+        <div class="module-cards-grid" id="modeModuleCardsGrid">
+          <!-- Populated dynamically by JavaScript -->
+        </div>
+      </div>
+
+      <!-- =========================================================
+           CCPU 8-STEP ALGORITHM CHAIN // ADVANCED DOSSIER & INSPECTOR
+           ========================================================= -->
+      <div class="tactical-frame algo-suite-container" id="algoSuiteCard">
+        <div class="card-header-bar" style="margin: -24px -24px 20px -24px;">
+          <div class="card-title">
+            <span class="card-title-icon" style="background: #4f46e5;"></span>
+            CCPU 8-STEP ALGORITHM CHAIN // ADVANCED SPECIFICATION &amp; INSPECTOR
+          </div>
+          <div class="card-subtext" id="algoStripStatus">
+            ACTIVE IN THIS MODE: 0 OF 8 STEPS · (N-1)th FRAME SEQUENTIAL CPU EXECUTION
+          </div>
+        </div>
+
+        <!-- 8 Interactive Steps Grid -->
+        <div class="algo-chain-grid" id="algoChainStrip">
+          <div class="algo-step-node selected-step" data-step="1">
+            <div class="step-num-badge"><span>STEP 1</span> <span style="color:#d97706;">⚠ UNBUDGETED</span></div>
+            <div class="step-name">Association</div>
+            <div class="step-latency">Cross-STN Fusion</div>
+          </div>
+          <div class="algo-step-node" data-step="2">
+            <div class="step-num-badge"><span>STEP 2</span> <span>~3.0 ms</span></div>
+            <div class="step-name">Kinematic Derivation</div>
+            <div class="step-latency">State Vector Gen</div>
+          </div>
+          <div class="algo-step-node" data-step="3">
+            <div class="step-num-badge"><span>STEP 3</span> <span>~2.0 ms</span></div>
+            <div class="step-name">Passive Ranging</div>
+            <div class="step-latency">NFR-ACC-02 (≤2%)</div>
+          </div>
+          <div class="algo-step-node" data-step="4">
+            <div class="step-num-badge"><span>STEP 4</span> <span>~3.0 ms</span></div>
+            <div class="step-name">Trajectory Estimation</div>
+            <div class="step-latency">IMM-EKF Multi-Model</div>
+          </div>
+          <div class="algo-step-node" data-step="5">
+            <div class="step-num-badge"><span>STEP 5</span> <span>~2.0 ms</span></div>
+            <div class="step-name">Reentry Point Calc</div>
+            <div class="step-latency">±1km CEP Ballistic</div>
+          </div>
+          <div class="algo-step-node" data-step="6">
+            <div class="step-num-badge"><span>STEP 6</span> <span style="color:#dc2626;">⚠ NO TIMING</span></div>
+            <div class="step-name">Launch &amp; Impact</div>
+            <div class="step-latency">FR-PERF-016 Ground</div>
+          </div>
+          <div class="algo-step-node" data-step="7">
+            <div class="step-num-badge"><span>STEP 7</span> <span>~3.0 ms</span></div>
+            <div class="step-name">Cue Generation</div>
+            <div class="step-latency">Stream 0x05 Port 5005</div>
+          </div>
+          <div class="algo-step-node" data-step="8">
+            <div class="step-num-badge"><span>STEP 8</span> <span style="color:#dc2626;">⚠ NOT STATED</span></div>
+            <div class="step-name">Target Classification</div>
+            <div class="step-latency">Kinematic Signature</div>
+          </div>
+        </div>
+
+        <!-- Technical Deep-Dive Inspector Box -->
+        <div class="algo-inspector-box" id="algoInspectorBox">
+          <div class="inspector-header">
+            <div class="inspector-step-title">
+              <span id="inspStepNum" style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-family:var(--font-mono); font-size:12px;">STEP 1</span>
+              <span id="inspStepName">ASSOCIATION &amp; CROSS-STATION TRACK FUSION</span>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <span class="nav-tab-badge" id="inspLatencyBadge" style="width:auto; padding:4px 12px; font-size:12px; background:#fff7ed; color:#d97706; border:1px solid #fed7aa;">
+                LATENCY: UNBUDGETED ⚠
+              </span>
+              <span class="nav-tab-badge" id="inspSpecBadge" style="width:auto; padding:4px 12px; font-size:12px; background:#f1f5f9; color:#475569; border:1px solid var(--border-subtle);">
+                SPEC: FR-PERF-014
+              </span>
+            </div>
+          </div>
+
+          <!-- Mathematical Model Formula -->
+          <div style="background:#ffffff; border:1px solid var(--border-subtle); border-radius:var(--r-md); padding:16px; margin-bottom:16px;">
+            <div class="dossier-card-title">📐 MATHEMATICAL FORMULATION &amp; ALGORITHMIC MODEL</div>
+            <div id="inspFormula" style="font-family:var(--font-mono); font-size:12px; color:#0f172a; background:#f8fafc; padding:12px; border-radius:4px; border:1px solid #e2e8f0; line-height:1.6; white-space:pre-wrap;">
+              Line-of-Sight Unit Vector: d = [cos(El)·sin(Az), cos(El)·cos(Az), sin(El)]ᵀ (ECEF frame)
+Pairwise Angular Correlation: δ(i,j) = arccos(d_i · d_j) ≤ θ_gate(R, σ_mount, parallax)
+Hungarian assignment optimization resolves track identity across STN 1, 2, and 3.
+            </div>
+          </div>
+
+          <!-- 3-Column Dossier Breakdown -->
+          <div class="inspector-grid">
+            <div class="dossier-card">
+              <div class="dossier-card-title">📥 INPUT DATA &amp; INGEST FORMAT</div>
+              <div class="dossier-body" id="inspInputText">
+                <b>Source:</b> 3 Station MPU Uplinks<br>
+                <b>Payload:</b> Payload 1 (port 5010, idx 20–499)<br>
+                <b>Framing:</b> 0xAA/0xDC, STN IDs (0x02, 0x03, 0x04)<br>
+                <b>Clock:</b> PTP µs timestamps (&lt;100 ns)
+              </div>
+              <div class="code-block-embed" id="inspInputCode">
+STRUCT StationObservation {
+  uint8_t stn_id; // 0x02, 0x03, 0x04
+  uint64_t ptp_timestamp_us;
+  double az_rad, el_rad;
+  float snr_db, quality_metric;
+};
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <div class="dossier-card-title">⚙ EXECUTION ENGINE &amp; LOGIC</div>
+              <div class="dossier-body" id="inspProcessText">
+                <b>Frame Alignment:</b> Runs on (N-1) frame history<br>
+                <b>Discipline:</b> Sequential CPU execution<br>
+                <b>Gating Engine:</b> Inter-station parallax angle gates<br>
+                <b>Constraint:</b> Up to 20 central target tracks
+              </div>
+              <div class="code-block-embed" id="inspProcessCode">
+// Association Execution Engine
+foreach target in candidate_tracks:
+  if angular_distance(ray_i, ray_j) &lt; gate:
+    fuse_tracks(i, j, weight_snr);
+              </div>
+            </div>
+
+            <div class="dossier-card">
+              <div class="dossier-card-title">📤 OUTPUT PRODUCTS &amp; CONSUMERS</div>
+              <div class="dossier-body" id="inspOutputText">
+                <b>Product:</b> Validated Central Tracklist Stream<br>
+                <b>Downstream:</b> Step 2 (Kinematic Derivation)<br>
+                <b>Storage:</b> Raw track history to SAN<br>
+                <b>Integrity:</b> Epipolar plane parity check
+              </div>
+              <div class="code-block-embed" id="inspOutputCode">
+STRUCT CentralTracklist {
+  uint32_t global_track_id;
+  uint8_t  associated_stations_mask;
+  double   los_unit_vector[3];
+  uint64_t fusion_epoch_us;
+};
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Complete 4-Mode Comparison Matrix Table -->
+      <div class="tactical-frame matrix-card-wrap" id="matrixCard">
+        <div class="card-header-bar" style="margin: -24px -24px 16px -24px;">
+          <div class="card-title">
+            <span class="card-title-icon" style="background: #0284c7;"></span>
+            COMPLETE FOUR-MODE PATH &amp; ALGORITHM ACTIVATION MATRIX
+          </div>
+          <div class="card-subtext">System-wide operational specifications across all operational regimes</div>
+        </div>
+
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>SUBSYSTEM / CAPABILITY</th>
+              <th>MODE 01 · SURVEILLANCE</th>
+              <th>MODE 02 · TARGET DETECT</th>
+              <th>MODE 03 · TARGET LOCK / ALERT</th>
+              <th>MODE 04 · MANUAL OPERATION</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Operational Posture</td>
+              <td>Autonomous scan, no track</td>
+              <td>Station detection, target held</td>
+              <td>High alert, locked / ballistic</td>
+              <td>Operator manual joystick control</td>
+            </tr>
+            <tr>
+              <td>Modules Active (CCPU)</td>
+              <td><span class="st-active">6 Modules</span></td>
+              <td><span class="st-active">7 Modules</span></td>
+              <td><span class="st-active">8 Modules (All)</span></td>
+              <td><span class="st-active">6 Modules</span></td>
+            </tr>
+            <tr>
+              <td>Chain Depth (8-Step Chain)</td>
+              <td class="st-dormant">0 / 8 (Dormant)</td>
+              <td><span class="st-cont">5 / 8 (Steps 1–4, 7)</span></td>
+              <td><span class="st-high">8 / 8 (Every Frame)</span></td>
+              <td class="st-dormant">0 / 8 (Dormant - Bypass)</td>
+            </tr>
+            <tr>
+              <td>Cue Mode &amp; Protocol</td>
+              <td class="st-dormant">IDLE (No Cue)</td>
+              <td><span class="st-cont">CONTINUOUS (RE-CUE)</span></td>
+              <td><span class="st-high">HIGH-RATE CONTINUOUS</span></td>
+              <td class="st-active">OPERATOR (0x08 / 0x09)</td>
+            </tr>
+            <tr>
+              <td>Data Stream Processing (DSP)</td>
+              <td class="st-dormant">DORMANT (Ingress Ignored)</td>
+              <td class="st-active">ACTIVE (Payload 1 5010)</td>
+              <td class="st-active">ACTIVE (Continuous)</td>
+              <td class="st-dormant">DORMANT (Manual Bypass)</td>
+            </tr>
+            <tr>
+              <td>Reentry &amp; Impact Derivation</td>
+              <td class="st-dormant">DORMANT</td>
+              <td class="st-dormant">DORMANT</td>
+              <td><span class="st-high">ACTIVE (±1km CEP)</span></td>
+              <td class="st-dormant">DORMANT</td>
+            </tr>
+            <tr>
+              <td>Symbology &amp; Overlay on Wall</td>
+              <td class="st-active">BASE (Labels, Crosshairs)</td>
+              <td class="st-active">+ TRACK BOX / RETICLE</td>
+              <td><span class="st-high">+ URGENT ALERT FLASH</span></td>
+              <td class="st-dormant">NOT STATED (Video Only)</td>
+            </tr>
+            <tr>
+              <td>Gimbal Command (RS422 921k)</td>
+              <td class="st-dormant">DORMANT (Station Local)</td>
+              <td><span class="st-cont">CLOSED-LOOP (10 ms)</span></td>
+              <td><span class="st-high">BALLISTIC TRACK (10 ms)</span></td>
+              <td class="st-active">OPERATOR DIRECT (10 ms)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div> <!-- /modeStandardView -->
+
+
+    <!-- =========================================================
+         TAB 05: FULL DATA FLOW PER MODULE (DEDICATED COMMAND VIEW)
+         ========================================================= -->
+    <div id="moduleFlowView">
+
+      <!-- Hero Banner for Tab 5 -->
+      <div class="flow-hero-banner">
+        <h2>
+          <span>📋</span> CCPU MODULE DOSSIERS — FULL DATA FLOW ARCHITECTURE
+        </h2>
+        <p>
+          (full data flow per module: IN → PROCESS → OUT → REF / GAP — the same modules shown activated / dormant in the per-mode tabs).
+          Inspect exact payload structures, hardware execution disciplines, network port maps, and operational status per mode.
+        </p>
+      </div>
+
+      <!-- Filter Controls Ribbon -->
+      <div class="flow-filter-ribbon">
+        <div class="filter-group">
+          <span class="filter-label">Modules:</span>
+          <button class="filter-btn-pill active" data-filter="all">All Modules (12)</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Mode Perspective:</span>
+          <button class="filter-btn-pill active" data-mode-view="master">Master Spec (All Modes)</button>
+          <button class="filter-btn-pill" data-mode-view="1">Mode 01: Scan</button>
+          <button class="filter-btn-pill" data-mode-view="2">Mode 02: Detect</button>
+          <button class="filter-btn-pill" data-mode-view="3">Mode 03: Lock/Alert</button>
+          <button class="filter-btn-pill" data-mode-view="4">Mode 04: Manual</button>
+        </div>
+      </div>
+
+      <!-- Master Module Dossier Grid -->
+      <div class="master-dossier-grid" id="masterDossierContainer">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
+
+    </div> <!-- /moduleFlowView -->
+
+
+    <!-- =========================================================
+         DEDICATED TIMING SECTION AT THE END (Requested by user)
+         "show timming add on end as different one"
+         ========================================================= -->
+    <section class="timing-section-wrap" id="timing-section">
+      <div class="timing-header-strip">
+        <div class="timing-headline">
+          <h2>⏱ PROCESSING PIPELINE TIMING BUDGET &amp; LATENCY WATERFALL</h2>
+          <div class="timing-subline">
+            Document-stated worst-case latencies across sensor stations, network transmission, CCPU algorithms, and gimbal execution.
+          </div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 13px; font-weight: 800; color: #0284c7; background: #f0f9ff; padding: 6px 14px; border-radius: 4px; border: 1px solid #bae6fd;">
+          TARGET BUDGET: ≤ 50 ms
+        </div>
+      </div>
+
+      <!-- Visual Latency Waterfall Chart -->
+      <div class="waterfall-card">
+        <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; margin-bottom: 16px; color: var(--text-main);">
+          PIPELINE LATENCY WATERFALL (END-TO-END TIMELINE)
+        </div>
+
+        <div class="waterfall-bar-row">
+          <div class="wf-label">1. SPU/MPU (Frame N)</div>
+          <div class="wf-track">
+            <div class="wf-seg" style="width: 14%; background: #0284c7;">~7.0 ms</div>
+          </div>
+          <div class="wf-time">~7.0 ms</div>
+        </div>
+
+        <div class="waterfall-bar-row">
+          <div class="wf-label">2. L3 TSN RTT Transmission</div>
+          <div class="wf-track">
+            <div class="wf-seg" style="width: 14%; opacity: 0;"></div>
+            <div class="wf-seg" style="width: 8%; background: #4f46e5;">~4.0 ms</div>
+          </div>
+          <div class="wf-time">~4.0 ms</div>
+        </div>
+
+        <div class="waterfall-bar-row">
+          <div class="wf-label">3. CCPU Algorithm Chain (N-1)</div>
+          <div class="wf-track">
+            <div class="wf-seg" style="width: 22%; opacity: 0;"></div>
+            <div class="wf-seg" style="width: 20%; background: #d97706;">~10.0 ms</div>
+          </div>
+          <div class="wf-time">~10.0 ms</div>
+        </div>
+
+        <div class="waterfall-bar-row">
+          <div class="wf-label">4. Control &amp; Management</div>
+          <div class="wf-track">
+            <div class="wf-seg" style="width: 42%; opacity: 0;"></div>
+            <div class="wf-seg" style="width: 6%; background: #7c3aed;">~3.0 ms</div>
+          </div>
+          <div class="wf-time">~3.0 ms</div>
+        </div>
+
+        <div class="waterfall-bar-row">
+          <div class="wf-label">5. Gimbal Command Response</div>
+          <div class="wf-track">
+            <div class="wf-seg" style="width: 48%; opacity: 0;"></div>
+            <div class="wf-seg" style="width: 20%; background: #dc2626;">~10.0 ms</div>
+          </div>
+          <div class="wf-time">~10.0 ms</div>
+        </div>
+
+        <div class="waterfall-bar-row" style="margin-top: 18px; padding-top: 12px; border-top: 2px dashed #cbd5e1;">
+          <div class="wf-label" style="font-weight: 800; color: #16a34a;">TOTAL STATED LATENCY</div>
+          <div class="wf-track">
+            <div class="wf-seg" style="width: 68%; background: linear-gradient(90deg, #0284c7 0%, #4f46e5 25%, #d97706 60%, #dc2626 100%);">
+              ~34.0 ms (COMPLIANT WITH ≤ 50 ms BUDGET)
+            </div>
+          </div>
+          <div class="wf-time" style="color: #16a34a; font-size: 14px;">~34.0 ms</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Tactical Footer -->
+  <footer class="tactical-footer">
+    <div>CCPU MK-VII ARCHITECTURE SUITE // WHITE THEME EXECUTIVE DOSSIER</div>
+    <div>ALL MODES ACTIVE · PTP CLOCK LOCKED (&lt;100 ns) · TSN 802.1Qbv DETERMINISTIC</div>
+  </footer>
+
+  <!-- Embedded Executive JavaScript -->
+  <script>
+    /* Synthetic Tactical Audio Synthesizer */
+    class TacticalAudio {
+      constructor() {
+        this.ctx = null;
+        this.on = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      }
+      beep(freq = 880, dur = 0.08, type = 'sine') {
+        if (!this.on) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+          o.type = type;
+          o.frequency.value = freq;
+          g.gain.setValueAtTime(0.04, this.ctx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + dur);
+          o.connect(g);
+          g.connect(this.ctx.destination);
+          o.start();
+          o.stop(this.ctx.currentTime + dur);
+        } catch (e) {}
+      }
+    }
+
+    const snd = new TacticalAudio();
+
+    /* Mode Configuration Telemetry Data */
+    const MODE_CONFIG = {
+      1: {
+        title: "MODE 01 — SCAN / SURVEILLANCE",
+        desc: "Stations run autonomous search/scan; no confirmed central track. CCPU job is display-only with composite HUD overlays on station video feeds. Algorithm chain is dormant.",
+        accent: "#0284c7",
+        light: "#f0f9ff",
+        modules: "6",
+        modulesSub: "Base Infrastructure",
+        chain: "0 / 8",
+        chainSub: "Algorithm Dormant",
+        cue: "IDLE",
+        cueSub: "No Cue Egress",
+        gimbal: "10 ms · RS422",
+        gimbalSub: "Station Local Scan",
+        activeSteps: []
+      },
+      2: {
+        title: "MODE 02 — TARGET DETECT",
+        desc: "Station SPU detects target. SPU+MPU deliver tracklist (Payload 1 · port 5010) to CCPU. CCPU runs PARTIAL chain (5 of 8 steps) to generate continuous closed-loop CUE commands to hold gimbal on track.",
+        accent: "#ea580c",
+        light: "#fff7ed",
+        modules: "7",
+        modulesSub: "DSP + Algo + Gimbal",
+        chain: "5 / 8",
+        chainSub: "Steps 1–4, 7 Active",
+        cue: "CONTINUOUS (RE-CUE)",
+        cueSub: "Port 5005 Slew Loop",
+        gimbal: "10 ms · RS422",
+        gimbalSub: "Continuous Closed Loop",
+        activeSteps: [1, 2, 3, 4, 7]
+      },
+      3: {
+        title: "MODE 03 — TARGET LOCK / MISSILE DETECT / ALERT",
+        desc: "Target locked, missile detected, or alert condition. The FULL 8-step algorithm chain runs EVERY FRAME. High-rate continuous cueing, ballistic reentry prediction (±1km CEP), and emergency alert state.",
+        accent: "#dc2626",
+        light: "#fef2f2",
+        modules: "8",
+        modulesSub: "Full System Active",
+        chain: "8 / 8",
+        chainSub: "Every Frame Live",
+        cue: "HIGH-RATE CONTINUOUS",
+        cueSub: "Ballistic Intercept Slew",
+        gimbal: "10 ms · RS422",
+        gimbalSub: "Ballistic Closed Loop",
+        activeSteps: [1, 2, 3, 4, 5, 6, 7, 8]
+      },
+      4: {
+        title: "MODE 04 — MANUAL OPERATION (OPERATOR PASSTHROUGH)",
+        desc: "Operator takes manual control from console. Active path: Console (Payload 2: 0x08 Override / 0x09 Manual) → C&M Module (ALL commands pass through CCPU, no bypass) → L3 Switch → Station MPU/SPU → Gimbal. Algorithm chain is dormant.",
+        accent: "#059669",
+        light: "#f0fdf4",
+        modules: "6",
+        modulesSub: "Operator Override",
+        chain: "0 / 8",
+        chainSub: "Operator is Brain",
+        cue: "OPERATOR (0x08 / 0x09)",
+        cueSub: "Console Passthrough",
+        gimbal: "10 ms · RS422",
+        gimbalSub: "921 kbps Joystick Slew",
+        activeSteps: []
+      },
+      5: {
+        title: "05 // FULL DATA FLOW (PER MODULE ARCHITECTURE)",
+        desc: "Master specification and technical dossiers for all 10 CCPU modules and external controllers: IN → PROCESS → OUT → REF / GAP, packet byte layouts, and operational states across all 4 modes.",
+        accent: "#4f46e5",
+        light: "#eef2ff",
+        modules: "10 CCPU Core",
+        modulesSub: "+ 2 External Controllers",
+        chain: "FULL MASTER",
+        chainSub: "10 Core Modules",
+        cue: "ALL MODES (0x05 / 0x08 / 0x09)",
+        cueSub: "Dynamic Routing",
+        gimbal: "10 ms · RS422",
+        gimbalSub: "921 kbps UART",
+        activeSteps: [1, 2, 3, 4, 5, 6, 7, 8]
+      }
+    };
+
+    /* Comprehensive 12 Modules Dossier Data (10 CCPU + 2 External) */
+    const MODULE_DOSSIERS = [
+      {
+        id: "sel",
+        num: "01",
+        name: "IP Video / Data Stream Selection Module",
+        role: "CCPU INGRESS & DEMULTIPLEXER",
+        tag: "10G TSN INGRESS · HARDWARE DEMUX",
+        modes: { 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" },
+        shortDesc: "Classifies and demultiplexes 25 video streams (SRT port 5020) and tracklists into internal ring buffers.",
+        in: "25 Video Streams via port 5020 (SRT); Payload 1 tracklist via port 5010 (idx 20–499, 0xAA/0xDC framing); IEEE 802.1AS Timesync data from GM 10.0.0.10; Console commands via Payload 2.",
+        process: "Stream classifier and demultiplexer. Parses ethernet headers, demuxes VLAN20 (SMPTE 2110 uncompressed), VLAN30 (H.264/H.265 compressed video), and VLAN35 (Payload 1 tracklist) into internal zero-copy ring buffers.",
+        out: "• Stream 0x01/0x02 (H.264/H.265) → Video Acquisition Module (NVDEC)<br>• Stream 0x03/0x04 (SMPTE 2110) → SMPTE 2110 Gateway<br>• Payload 1 (0xAA/0xDC) → Data Stream Processing Module<br>• Timesync Packets → Timesync Module",
+        ref: "Ingress classification latency &lt; 0.5 ms. Base system infrastructure (FR-PERF-010).",
+        gap: "Base infrastructure in all modes. No explicit per-mode filtering gap.",
+        struct: `STRUCT StreamDemuxHeader {
+  uint32_t stream_id;      // 0x01..0x04, 0x05, 0x08, 0x09
+  uint16_t vlan_tag;       // VLAN 20, 30, 35
+  uint16_t port;           // 5005, 5010, 5020
+  uint64_t ingress_ts_us;  // PTP hardware capture time
+};`
+      },
+      {
+        id: "gw",
+        num: "02",
+        name: "SMPTE 2110 Gateway",
+        role: "UNCOMPRESSED VIDEO BYPASS INTERFACE",
+        tag: "FPGA / DIRECT INTERFACE · LOWEST LATENCY",
+        modes: { 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" },
+        shortDesc: "Hardware depacketizer for uncompressed 2110 video feeds direct to Video Wall, bypassing GPU NVDEC.",
+        in: "Streams 0x03 & 0x04 uncompressed SMPTE 2110 video frames via VLAN20 from L3 Switch.",
+        process: "Hardware depacketizer and direct raster framing. Bypasses GPU NVDEC decode entirely for zero-compression video feeds from high-speed camera sensors.",
+        out: "Direct uncompressed digital video stream → HDMI Output → Video Wall Controller (decode bypass path).",
+        ref: "Lowest display latency (&lt; 1.0 ms). Independent parallel path to compressed video NVDEC decode.",
+        gap: "Decode-bypass path operating in all operational modes without GPU queue latency.",
+        struct: `STRUCT Smpte2110Frame {
+  uint32_t sequence_num;
+  uint16_t line_number;
+  uint8_t  payload_type;   // 0x03 / 0x04
+  uint8_t  raw_pixels[1920 * 1080 * 3];
+};`
+      },
+      {
+        id: "dec",
+        num: "03",
+        name: "Video Acquisition Module (NVDEC)",
+        role: "COMPRESSED VIDEO HARDWARE DECODER",
+        tag: "GPU · NVDEC HARDWARE · Nth FRAME PARALLEL",
+        modes: { 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" },
+        shortDesc: "Hardware GPU NVDEC decoder processing 25 compressed video streams in parallel with CPU tracking.",
+        in: "SRT streams (25 streams, port 5020) carrying H.264 (0x01) and H.265 (0x02) compressed video.",
+        process: "SRT demultiplexing followed by hardware NVDEC multi-channel decode. Decodes Nth incoming frame in parallel with the sequential (N-1)th CPU tracking chain.",
+        out: "Decoded YUV/RGB video frames → Video Wall Interface Module & Video Frame Archiver.",
+        ref: "~7.0 ms worst-case hardware decode latency (FR-PERF-012 · I-SW-002).",
+        gap: "Continuous hardware decode across all modes to sustain situational awareness on video wall.",
+        struct: `STRUCT NvdecFrameBuffer {
+  uint32_t frame_index;
+  uint64_t ptp_timestamp_us;
+  uint16_t width, height;
+  void*    gpu_surface_ptr;
+};`
+      },
+      {
+        id: "dsp",
+        num: "04",
+        name: "Data Stream Processing Module",
+        role: "TRACKLIST INGEST & TIMING VALIDATION",
+        tag: "CPU · (N-1)th FRAME · SEQUENTIAL PIPELINE",
+        modes: { 1: "DORMANT", 2: "ACTIVE", 3: "ACTIVE", 4: "DORMANT" },
+        shortDesc: "Ingests Payload 1, checks 0xAA/0xDC framing, verifies ≤1.25 ms timing window, and dispatches to algorithms.",
+        in: "Station MPU/SPU Payload 1 (port 5010, indices 20–499, 0xAA/0xDC framing, Station IDs 0x02/0x03/0x04).",
+        process: "0xAA/0xDC preamble validation, Station ID extraction, OSS/STN mode alignment, frame validity check within ≤ 1.25 ms time window, and PTP microsecond timestamp correlation.",
+        out: "Validated Central Tracklist Stream → Algorithm Processing Module (8-step chain).",
+        ref: "Part of FR-PERF-010 specification. Sub-millisecond CPU validation budget.",
+        gap: "⚠ DOCUMENT GAP: Execution time unbudgeted as separate row in processing pipeline document.",
+        struct: `STRUCT Payload1TracklistPacket {
+  uint16_t preamble;       // 0xAA 0xDC
+  uint8_t  station_id;     // 0x02, 0x03, 0x04
+  uint8_t  oss_stn_mode;   // Mode alignment flag
+  uint64_t ptp_timestamp;  // Microseconds since epoch
+  uint16_t track_count;    // Up to 20 candidate tracks
+  TrackObj tracks[20];     // Indices 20–499
+};`
+      },
+      {
+        id: "ts",
+        num: "05",
+        name: "Timesync Module (PTP Server App)",
+        role: "SYSTEM-WIDE TIME GRANDMASTER SYNC",
+        tag: "PTP · DEDICATED CPU CORE · IEEE 802.1AS",
+        modes: { 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" },
+        shortDesc: "Locks to Grandmaster 10.0.0.10 with <100 ns phase error; timestamps all frames, tracks, and logs.",
+        in: "IEEE 802.1AS PTP timestamp packets from PTP Grandmaster (10.0.0.10) locked to GPS reference clock.",
+        process: "Dedicated core PTP Server daemon executing Phase Locked Loop (PLL). Maintains continuous lock with &lt; 100 ns phase error across all network interfaces.",
+        out: "System-wide monotonic microsecond timestamps stamped into all video frames, track packets, and command frames; DR-DATA-003 network monitor logs.",
+        ref: "IEEE 802.1AS standard compliance, &lt; 100 ns phase jitter (DR-DATA-003).",
+        gap: "Operates continuously in all modes on isolated CPU affinity core.",
+        struct: `STRUCT PtpStatusPacket {
+  uint64_t grandmaster_epoch_ns;
+  int32_t  phase_offset_ns;     // Target &lt; 100 ns
+  uint32_t sync_sequence_id;
+  uint8_t  clock_stratum;       // Stratum-1 GPS lock
+};`
+      },
+      {
+        id: "vwm",
+        num: "06",
+        name: "Video Wall Interface Module",
+        role: "DISPLAY COMPOSITOR & OUTPUT BUFFER",
+        tag: "CCPU MODULE · DUAL-BUS HDMI & ARCHIVE",
+        modes: { 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" },
+        shortDesc: "Buffers decoded video frames and dispatches HDMI feeds to Video Wall Controller + SAN archiver.",
+        in: "Decoded video frames from Video Acquisition Module (NVDEC) + Symbology compositing feed.",
+        process: "Frame queueing, display buffer synchronization with multi-head Video Wall Controller refresh (60Hz / 120Hz), and dual-bus frame splitter.",
+        out: "• Path 1: HDMI digital output stream → Video Wall Controller (display path)<br>• Path 2: Decoded video frames → Data Management Module (SAN short-term ring buffer)",
+        ref: "Sub-millisecond frame buffer latency (&lt; 1.0 ms). Direct hardware display scanout.",
+        gap: "Base display infrastructure operating across all modes.",
+        struct: `STRUCT VideoWallBuffer {
+  uint32_t frame_id;
+  uint8_t  channel_id;     // 1 to 4 Wall Heads
+  void*    hdmi_frame_ptr; // Mapped DMA display buffer
+  uint8_t  archive_flag;   // 1 = committed to SAN
+};`
+      },
+      {
+        id: "algo",
+        num: "07",
+        name: "Algorithm Processing Module",
+        role: "8-STEP TRACKING & CUE CHAIN",
+        tag: "CPU · (N-1)th FRAME · SEQUENTIAL CORE",
+        modes: { 1: "DORMANT", 2: "ACTIVE", 3: "ACTIVE", 4: "DORMANT" },
+        shortDesc: "Sequential execution engine hosting the 8-step algorithm chain (Association → Kinematics → ... → Cue).",
+        in: "Validated tracklist stream from Data Stream Processing Module (Azimuth, Elevation, SNR, range metrics).",
+        process: "8-Step Algorithm Pipeline: Step 1 Association → Step 2 Kinematics → Step 3 Passive Ranging → Step 4 IMM Trajectory → Step 5 Reentry → Step 6 Launch/Impact → Step 7 Cue Generation → Step 8 Target Classification.",
+        out: "• Az/El Cue packets (stream 0x05, port 5005) → Control & Management Module<br>• Dynamic track state vectors & impact coordinates → Symbology Generation<br>• Full trajectory history → Data Management Module (SAN)",
+        ref: "~10.0 ms budgeted CPU execution window (FR-PERF-010). Mode 02 runs 5/8 steps; Mode 03 runs 8/8 steps.",
+        gap: "⚠ DOCUMENT GAPS: Step 1 unbudgeted; Step 6 no timing row; Step 8 time not stated.",
+        struct: `STRUCT AlgoChainState {
+  uint32_t active_step_mask;   // 0x00, 0x4F, 0xFF
+  double   state_vector[9];    // X, Y, Z, Vx, Vy, Vz, Ax, Ay, Az
+  double   covariance_mat[9][9];
+  uint64_t compute_duration_us;
+};`
+      },
+      {
+        id: "dmm",
+        num: "08",
+        name: "Data Management Module",
+        role: "10G SAN STORAGE & RECORDING",
+        tag: "REDUNDANT FILE SYSTEM · 10G SFP+",
+        modes: { 1: "NOT_STATED", 2: "NOT_STATED", 3: "ACTIVE", 4: "NOT_STATED" },
+        shortDesc: "Archives decoded video frames, track histories, trajectory splines, and operator logs to 10G SAN.",
+        in: "Decoded video frames (from Video Wall Interface), raw tracklists, full trajectory history, and operator console action logs.",
+        process: "High-throughput serialization and circular ring buffering to redundant local SSD arrays and 10G SAN storage (SFP/SFP+).",
+        out: "Long-term mission archive in SAN storage; Processed event records and audit logs → Control & Management Module.",
+        ref: "~2.0 ms write commit latency (FR-PERF-018 · FR-CCPU-203 · NFR-REL-02).",
+        gap: "⚠ SPEC GAP: Explicit event logging mandated for Mode 03; Mode 01/02/04 archival state not specified in document.",
+        struct: `STRUCT SanArchiveRecord {
+  uint64_t record_uuid;
+  uint64_t ptp_timestamp_us;
+  uint32_t payload_size_bytes;
+  uint8_t  compression_type; // 0=RAW, 1=ZSTD
+};`
+      },
+      {
+        id: "sym",
+        num: "09",
+        name: "Symbology & Overlay Generation Module",
+        role: "TACTICAL HUD & OVERLAY COMPOSITOR",
+        tag: "CPU + GPU · (N-1)th FRAME · 2.0 ms",
+        modes: { 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "NOT_STATED" },
+        shortDesc: "Renders HUD reticles, target bounding boxes, trajectory splines, and emergency alerts onto video feeds.",
+        in: "Target Az/El coordinates, velocity vectors, Launch Point (LP), Reentry Point (REP), and impact coordinates from Algorithm Processing.",
+        process: "Real-time vector symbology rendering and alpha-channel composition directly over decoded station video feeds.",
+        out: "Composited digital video stream with tactical graphics → HDMI → Video Wall Controller.",
+        ref: "~2.0 ms worst-case rendering latency (FR-CCPU-201).",
+        gap: "M1 = Base symbology (crosshairs/UTC); M2 = + Track box/reticle; M3 = + Urgent hazard state; M4 = Not stated.",
+        struct: `STRUCT SymbologyOverlayPacket {
+  uint32_t target_track_id;
+  float    screen_x, screen_y;
+  uint32_t bounding_box_w, bounding_box_h;
+  uint8_t  color_state;      // 0=Cyan, 1=Amber, 2=Red Hazard
+};`
+      },
+      {
+        id: "cm",
+        num: "10",
+        name: "Control & Management Module",
+        role: "REAL-TIME C&C ARBITRATION & ROUTING",
+        tag: "CPU · EVENT-DRIVEN ROUTER · ~3.0 ms",
+        modes: { 1: "NOT_STATED", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" },
+        shortDesc: "Prioritizes and routes operator commands (Payload 2) and CCPU cue packets (stream 0x05) to station gimbals.",
+        in: "Console commands via Payload 2 (streams 0x02/0x06/0x08/0x09), Algorithm Az/El cue packets (stream 0x05), and SAN audit logs.",
+        process: "Command prioritization and arbitration. Enforces rule that ALL console commands route through CCPU without bypass. Generates C&C packets for station gimbal slew.",
+        out: "• C&C Command packets → L3 Switch → Station MPU/SPU → Gimbal Controller<br>• OSS configuration and telemetry data → Video Wall Controller",
+        ref: "~3.0 ms event-driven latency (I-SW-003). Continuous cue egress in Modes 02/03; Full override in Mode 04.",
+        gap: "M1 = Console calibration only; M2 = Continuous re-cue; M3 = High-rate continuous cue; M4 = Full console passthrough.",
+        struct: `STRUCT CommandPacketHeader {
+  uint8_t  stream_type;    // 0x05 Cue, 0x08 Override, 0x09 Manual
+  uint16_t target_station; // STN 1, 2, or 3
+  double   target_az_deg, target_el_deg;
+  uint64_t command_epoch_us;
+};`
+      },
+      {
+        id: "gmb",
+        num: "11",
+        name: "Sensor Station Gimbal Controller",
+        role: "DUAL-AXIS PRECISION TARGETING GIMBAL",
+        tag: "EXTERNAL SERVO · 10 ms CYCLE · RS422 921 kbps",
+        modes: { 1: "DORMANT", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" },
+        shortDesc: "Executes 10 ms closed-loop slew commands over RS422 serial line at 921 kbps for high-speed tracking.",
+        in: "10 ms closed-loop slew commands via RS422 serial line (921 kbps) from Station MPU/SPU.",
+        process: "Dual-axis servo positioning loop (Azimuth & Elevation) with optical encoder feedback and lead time compensation.",
+        out: "Line-of-Sight mechanical pointing of HD EO/MWIR sensors on incoming threat trajectory.",
+        ref: "10 ms command cycle constraint; 921 kbps RS422 protocol.",
+        gap: "Dormant in Mode 01 (autonomous station scan); Closed-loop CCPU cue in Modes 02/03; Direct operator slew in Mode 04.",
+        struct: `STRUCT GimbalSerialFrame {
+  uint8_t  header;          // 0x55
+  int32_t  az_micro_deg;    // Quantized Azimuth
+  int32_t  el_micro_deg;    // Quantized Elevation
+  uint16_t checksum;        // CRC-16
+};`
+      },
+      {
+        id: "l3sw",
+        num: "12",
+        name: "L3 TSN Switch Backbone & PTP Grandmaster",
+        role: "TIME-SENSITIVE HIGH-SPEED BACKBONE",
+        tag: "IEEE 802.1Qbv TSN · 10G SFP+ · <100 ns PTP",
+        modes: { 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" },
+        shortDesc: "Deterministic communication backbone with time-aware scheduling and strict VLAN QoS.",
+        in: "All ingress/egress Ethernet frames across 3 Stations, CCPU server, Video Wall, and SAN storage.",
+        process: "IEEE 802.1Qbv time-aware scheduling, strict priority queueing (PCP4 for tracklist/CUE), VLAN segmentation (VLAN20/30/35).",
+        out: "Deterministic, collision-free packet delivery with bounded microsecond switching latency.",
+        ref: "IEEE 802.1Qbv, IEEE 802.1AS, NFR-REL-02 redundant switching.",
+        gap: "Always active across all modes as the foundational communication fabric.",
+        struct: `STRUCT TsnSwitchVlanMap {
+  uint16_t vlan_video_2110; // VLAN 20
+  uint16_t vlan_video_srt;  // VLAN 30
+  uint16_t vlan_tracklist;  // VLAN 35 (PCP 4)
+};`
+      }
+    ];
+
+    /* Advanced 8-Step Algorithm Dossiers */
+    const STEP_DOSSIERS = {
+      1: {
+        name: "ASSOCIATION & CROSS-STATION TRACK FUSION",
+        latency: "UNBUDGETED ⚠",
+        spec: "FR-PERF-014",
+        gap: "DOCUMENT GAP ⚠",
+        formula: `Line-of-Sight Unit Vector: d = [cos(El)·sin(Az), cos(El)·cos(Az), sin(El)]ᵀ (ECEF frame)
+Pairwise Angular Correlation: δ(i,j) = arccos(d_i · d_j) ≤ θ_gate(R, σ_mount, parallax)
+Hungarian assignment optimization resolves track identity across STN 1, 2, and 3.`,
+        input: `<b>Source:</b> 3 Station MPU Uplinks<br><b>Payload:</b> Payload 1 (port 5010, idx 20–499)<br><b>Framing:</b> 0xAA/0xDC, STN IDs (0x02, 0x03, 0x04)<br><b>Clock:</b> PTP µs timestamps (&lt;100 ns)`,
+        inputCode: `STRUCT StationObservation {
+  uint8_t stn_id; // 0x02, 0x03, 0x04
+  uint64_t ptp_timestamp_us;
+  double az_rad, el_rad;
+  float snr_db, quality_metric;
+};`,
+        process: `<b>Frame Alignment:</b> Runs on (N-1) frame history<br><b>Discipline:</b> Sequential CPU execution<br><b>Gating Engine:</b> Inter-station parallax angle gates<br><b>Constraint:</b> Up to 20 central target tracks`,
+        processCode: `// Association Execution Engine
+foreach target in candidate_tracks:
+  if angular_distance(ray_i, ray_j) &lt; gate:
+    fuse_tracks(i, j, weight_snr);`,
+        output: `<b>Product:</b> Validated Central Tracklist Stream<br><b>Downstream:</b> Step 2 (Kinematic Derivation)<br><b>Storage:</b> Raw track history to SAN<br><b>Integrity:</b> Epipolar plane parity check`,
+        outputCode: `STRUCT CentralTracklist {
+  uint32_t global_track_id;
+  uint8_t  associated_stations_mask;
+  double   los_unit_vector[3];
+  uint64_t fusion_epoch_us;
+};`
+      },
+      2: {
+        name: "KINEMATIC DERIVATION & STATE VECTOR GENERATION",
+        latency: "~3.0 ms Worst-Case",
+        spec: "PIPELINE P1 SPEC",
+        gap: "NOMINAL TIMING",
+        formula: `Angular Velocity: ω_az = [Az(t) − Az(t−Δt)] / Δt,  ω_el = [El(t) − El(t−Δt)] / Δt
+Topocentric Rate Tensor: v_topo = R_ecef_to_topo · [d/dt (r_target − r_station)]
+Low-Pass Butterworth Filter removes high-frequency gimbal mount vibration.`,
+        input: `<b>Source:</b> Associated Central Tracklist (Step 1)<br><b>State Input:</b> Current &amp; historical (N-1, N-2) azimuth/elevation<br><b>Station Reference:</b> ECEF mount coordinates r_stn`,
+        inputCode: `STRUCT TrackHistoryBuffer {
+  double az_history[4];
+  double el_history[4];
+  uint64_t t_history_us[4];
+};`,
+        process: `<b>Numerical Method:</b> Finite-difference rate estimation<br><b>Filtering:</b> 2nd order Butterworth digital filter<br><b>Coordinate Rotation:</b> WGS84 ECEF to topocentric ENU`,
+        processCode: `// Kinematic Rate Derivation
+double dt = (t_now - t_prev) * 1e-6;
+double d_az = unwrap(az_now - az_prev) / dt;
+double d_el = (el_now - el_prev) / dt;`,
+        output: `<b>Product:</b> Kinematic Rate Vector [Az, El, Az_dot, El_dot]<br><b>Downstream:</b> Step 3 (Passive Ranging) &amp; Step 4 (Trajectory)<br><b>Display:</b> Rate vectors forwarded to Symbology`,
+        outputCode: `STRUCT KinematicState {
+  uint32_t track_id;
+  double az_rad, el_rad;
+  double az_rate_rad_s, el_rate_rad_s;
+};`
+      },
+      3: {
+        name: "PASSIVE RANGING & TRIANGULATION SOLVER",
+        latency: "~2.0 ms Worst-Case",
+        spec: "NFR-ACC-02 (≤2%)",
+        gap: "SLANT RANGE ACC",
+        formula: `Closest Point of Approach (CPA) Triangulation:
+Ray 1: p1(s) = r1 + s·d1,   Ray 2: p2(t) = r2 + t·d2
+Solve: [d1·d1, -d1·d2; d1·d2, -d2·d2] · [s; t] = [(r2-r1)·d1; (r2-r1)·d2]
+Range Verification: Slant range accuracy ≤ 2% error across multi-station baseline.`,
+        input: `<b>Source:</b> Synchronized LOS rays from 2 or 3 stations<br><b>Baseline:</b> Geodetic distance between Station 1, 2, and 3<br><b>Error Bounds:</b> Sensor encoder accuracy σ_theta ≤ 50 µrad`,
+        inputCode: `STRUCT MultiRayGeometry {
+  double stn1_ecef[3], stn2_ecef[3];
+  double los_stn1[3], los_stn2[3];
+};`,
+        process: `<b>Mathematical Core:</b> Skew line intersection / least-squares CPA<br><b>Parallelism:</b> Computed simultaneously for up to 20 central tracks<br><b>Range Limit:</b> Validated up to 300+ km horizon`,
+        processCode: `// Triangulation Solver
+Vector3 w0 = r1 - r2;
+double a = dot(d1, d1), b = dot(d1, d2), c = dot(d2, d2);
+double s = (b*e - c*d) / (a*c - b*b);
+Vector3 target_pos = r1 + s * d1;`,
+        output: `<b>Product:</b> 3D Cartesian Position [X, Y, Z] in ECEF<br><b>Downstream:</b> Step 4 (Trajectory Kalman Filter)<br><b>Metric:</b> Slant range R_slant = ||target_pos − r_stn||`,
+        outputCode: `STRUCT TriangulationResult {
+  double target_ecef[3];
+  double slant_range_m;
+  double residual_error_m;
+};`
+      },
+      4: {
+        name: "TRAJECTORY ESTIMATION & KALMAN PREDICTOR",
+        latency: "~3.0 ms Worst-Case",
+        spec: "FR-CCPU-102",
+        gap: "IMM DYNAMICS",
+        formula: `Interacting Multiple Model Extended Kalman Filter (IMM-EKF):
+Predict: x⁻ = F·x,  P⁻ = F·P·Fᵀ + Q
+Innovation: ν = z − h(x⁻),  S = H·P⁻·Hᵀ + R
+Update: K = P⁻·Hᵀ·S⁻¹,  x = x⁻ + K·ν,  P = (I − K·H)·P⁻
+Parallel Models: Constant Velocity (CV), Constant Accel (CA), Coordinated Turn (CT).`,
+        input: `<b>Source:</b> Step 3 Passive Ranging + Step 2 Kinematics<br><b>Measurement:</b> ECEF Cartesian position &amp; velocity rates<br><b>Noise Matrices:</b> Process noise Q, Measurement noise R<br><b>Model Probabilities:</b> IMM model transition matrix`,
+        inputCode: `STRUCT KalmanMeasurement {
+  double z_measured[6]; // X, Y, Z, Vx, Vy, Vz
+  double R_covariance[6][6];
+  uint64_t timestamp_us;
+};`,
+        process: `<b>IMM Mixing:</b> State interaction &amp; probability weighting<br><b>Kalman Update:</b> Optimal recursive MMSE update<br><b>Covariance:</b> Full 9x9 state uncertainty tracking<br><b>Output Frequency:</b> Dispatched every (N-1) frame`,
+        processCode: `// IMM-EKF Cycle
+predict_models(CV, CA, CT);
+update_filter_with_measurement(z);
+fuse_imm_estimates();`,
+        output: `<b>Product:</b> Continuous 9-state Trajectory Spline [X, Y, Z, Vx, Vy, Vz, Ax, Ay, Az]<br><b>Downstream:</b> Step 5 (Reentry), Step 7 (Cue Generation)<br><b>Archive:</b> State history logged to SAN`,
+        outputCode: `STRUCT TrajectoryState {
+  double state[9];
+  double P_cov[9][9];
+  float  prob_cv, prob_ca, prob_ct;
+};`
+      },
+      5: {
+        name: "REENTRY POINT CALCULATION & ATMOSPHERIC IMPACT",
+        latency: "~2.0 ms Worst-Case",
+        spec: "NFR-ACC-03 (±1 km CEP)",
+        gap: "BALLISTIC RK4",
+        formula: `Atmospheric Deceleration: a_drag = −0.5·(C_d · A / m) · ρ(h) · ||v|| · v
+Atmospheric Density: ρ(h) = ρ_0 · exp(−h / H_scale) (US Standard Atmosphere)
+Runge-Kutta 4th Order (RK4) orbital integration forward to 80 km boundary.
+Impact Uncertainty Ellipse: CEP ≤ ±1.0 km radius.`,
+        input: `<b>Source:</b> Filtered 9-State Vector from Step 4<br><b>Atmospheric Table:</b> NRLMSISE-00 / US Standard Atmosphere<br><b>Ballistic Coefficient:</b> Hypersonic drag profile table`,
+        inputCode: `STRUCT ReentryInput {
+  double ecef_pos[3], ecef_vel[3];
+  double ballistic_coeff_beta;
+};`,
+        process: `<b>Numerical Integrator:</b> 4th-order Runge-Kutta (RK4)<br><b>Termination Condition:</b> Altitude h = 80,000 m (Karman / Reentry Interface)<br><b>Covariance Projection:</b> Projects 9x9 covariance matrix onto reentry surface`,
+        processCode: `// Ballistic Reentry Forward Integration
+while (altitude > 80000.0) {
+  rk4_step(state, dt);
+}
+compute_cep_ellipse(P_projected);`,
+        output: `<b>Product:</b> Reentry Point Coordinates (Lat, Lon, Alt, Time-to-Reentry)<br><b>Accuracy:</b> ±1 km CEP compliance (NFR-ACC-03)<br><b>Downstream:</b> Step 6 &amp; Symbology Alert Display`,
+        outputCode: `STRUCT ReentryPoint {
+  double lat_deg, lon_deg, alt_m;
+  double t_reentry_epoch_us;
+  double cep_radius_m; // Target ≤ 1000m
+};`
+      },
+      6: {
+        name: "LAUNCH POINT & IMPACT POINT DERIVATION",
+        latency: "NO TIMING ROW ⚠",
+        spec: "FR-PERF-016",
+        gap: "DOCUMENT GAP ⚠",
+        formula: `Backward Extrapolation: t_backward integration: r(0) → Ground Elevation Datum (DEM)
+Forward Ballistic Extrapolation: a = g(r) + a_coriolis + a_centrifugal
+Solve for r(t_impact) such that Altitude(r) = DEM(Lat, Lon).`,
+        input: `<b>Source:</b> Step 4 Trajectory State + Step 5 Reentry Profile<br><b>Geospatial Elevation:</b> DTED Level-2 / SRTM Digital Elevation Model<br><b>Gravity Model:</b> WGS84 EGM96 Earth Gravitational Model`,
+        inputCode: `STRUCT LaunchImpactQuery {
+  double current_state[6];
+  uint32_t trajectory_type_id;
+};`,
+        process: `<b>Backward Solver:</b> Ballistic back-propagation to locate origin launch site<br><b>Forward Solver:</b> Impact point prediction with terrain intersection<br><b>Status:</b> Live ONLY in Mode 03 (Lock / Missile / Alert)`,
+        processCode: `// Impact Surface Intersection
+Vector3 ground_impact = solve_terrain_intersect(ballistic_path, dted_map);`,
+        output: `<b>Product:</b> Launch Point (LP) &amp; Impact Point (IP) Geodetic Coordinates<br><b>Downstream:</b> Mission Command C&amp;M, SAN Archival, Video Wall Alert Map`,
+        outputCode: `STRUCT LaunchImpactResult {
+  double launch_lat, launch_lon, launch_time;
+  double impact_lat, impact_lon, time_to_impact_s;
+};`
+      },
+      7: {
+        name: "CUE GENERATION & TOPOCENTRIC GIMBAL SLEW",
+        latency: "~3.0 ms Worst-Case",
+        spec: "FR-PERF-013 / 017",
+        gap: "PORT 5005 SLEW",
+        formula: `Topocentric Transformation: r_rel = r_target(t + Δt_lead) − r_station
+Azimuth Slew: Az_cmd = atan2(r_east, r_north)
+Elevation Slew: El_cmd = atan2(r_up, sqrt(r_east² + r_north²))
+Lead Time Compensation: Δt_lead = t_processing + t_network + 0.5·t_gimbal_cycle`,
+        input: `<b>Source:</b> Forward Extrapolated State from Step 4<br><b>Lead Horizon:</b> ~15 ms lookahead compensation<br><b>Station Coordinates:</b> Mount geodetic surveyed locations`,
+        inputCode: `STRUCT CueRequest {
+  uint8_t  target_stn_id; // STN 1, 2, or 3
+  double   future_pos_ecef[3];
+  double   lead_time_seconds;
+};`,
+        process: `<b>Coordinate Transformation:</b> WGS84 ECEF to topocentric ENU<br><b>Slew Rate Limiting:</b> Enforces max gimbal acceleration/velocity bounds<br><b>Dispatch:</b> UDP Stream 0x05, port 5005, VLAN35 (PCP 4)`,
+        processCode: `// Cue Lookahead Generation
+Vector3 p_future = extrapolate_pos(t_now + t_lead);
+double az_cmd = atan2(p_future.east, p_future.north);
+double el_cmd = atan2(p_future.up, hypot(p_future.east, p_future.north));
+send_cue_packet(target_stn, az_cmd, el_cmd);`,
+        output: `<b>Product:</b> High-rate quantized Gimbal Cue command<br><b>Downstream:</b> Control &amp; Management Module → L3 Switch → Station MPU/SPU → Gimbal<br><b>Protocol:</b> Stream 0x05 (port 5005) → RS422 921 kbps (10 ms cycle)`,
+        outputCode: `STRUCT GimbalCuePacket {
+  uint16_t stream_id;       // 0x05
+  uint8_t  stn_id;          // 0x02, 0x03, 0x04
+  double   az_command_deg;
+  double   el_command_deg;
+  uint64_t valid_epoch_us;
+};`
+      },
+      8: {
+        name: "TARGET CLASSIFICATION & KINEMATIC SIGNATURE",
+        latency: "TIME NOT STATED ⚠",
+        spec: "PNG ALGORITHM LIST",
+        gap: "DOCUMENT GAP ⚠",
+        formula: `Kinematic Signature Matching:
+Feature Vector: f = [||v_max||, a_lateral_max, altitude_apogee, radar_cross_section, ir_radiance]
+Euclidean Metric: D_k = (f − μ_k)ᵀ · Σ_k⁻¹ · (f − μ_k)
+Classifier: Class = argmin_k D_k (Ballistic vs Aerodynamic vs Drone vs Commercial)`,
+        input: `<b>Source:</b> Multi-sensor track features (IR intensity, kinematics, trajectory profile)<br><b>Threat Database:</b> Threat profile kinematic library`,
+        inputCode: `STRUCT TargetFeatureVector {
+  double max_velocity_mach;
+  double max_g_turn;
+  double apogee_altitude_km;
+  float  mwir_radiance_flux;
+};`,
+        process: `<b>Classification Engine:</b> Threat signature correlation<br><b>Threat Categorization:</b> Hypersonic boost-glide, ballistic, cruise, rotary/fixed-wing<br><b>Activation:</b> Live exclusively in Mode 03`,
+        processCode: `// Classification Engine
+uint32_t threat_class = match_threat_signature(features);
+set_target_threat_level(track_id, threat_class);`,
+        output: `<b>Product:</b> Classified Target Category &amp; Confidence Metric<br><b>Downstream:</b> Video Wall Tactical HUD &amp; SAN mission log`,
+        outputCode: `STRUCT ClassificationResult {
+  uint32_t track_id;
+  char     class_name[32]; // "BALLISTIC_MRBM"
+  float    confidence_score; // 0.0 - 1.0
+};`
+      }
+    };
+
+    /* Interactive 8-Step Inspector Function */
+    const stepNodes = document.querySelectorAll('.algo-step-node');
+
+    function inspectStep(stepNum) {
+      snd.beep(1200, 0.06);
+      const d = STEP_DOSSIERS[stepNum];
+      if (!d) return;
+
+      stepNodes.forEach(n => {
+        n.classList.toggle('selected-step', parseInt(n.getAttribute('data-step')) === stepNum);
+      });
+
+      document.getElementById('inspStepNum').textContent = `STEP ${stepNum}`;
+      document.getElementById('inspStepName').textContent = d.name;
+      document.getElementById('inspLatencyBadge').textContent = `LATENCY: ${d.latency}`;
+      document.getElementById('inspSpecBadge').textContent = `SPEC: ${d.spec}`;
+      document.getElementById('inspFormula').textContent = d.formula;
+
+      document.getElementById('inspInputText').innerHTML = d.input;
+      document.getElementById('inspInputCode').textContent = d.inputCode;
+
+      document.getElementById('inspProcessText').innerHTML = d.process;
+      document.getElementById('inspProcessCode').textContent = d.processCode;
+
+      document.getElementById('inspOutputText').innerHTML = d.output;
+      document.getElementById('inspOutputCode').textContent = d.outputCode;
+    }
+
+    stepNodes.forEach(n => {
+      n.addEventListener('click', () => {
+        inspectStep(parseInt(n.getAttribute('data-step')));
+      });
+    });
+
+    /* Render Mode Standard View Module Cards */
+    function renderModeModuleCards(modeNum) {
+      const container = document.getElementById('modeModuleCardsGrid');
+      if (!container) return;
+      container.innerHTML = '';
+
+      MODULE_DOSSIERS.forEach(mod => {
+        const state = mod.modes[modeNum] || "ACTIVE";
+        let stateClass = "state-working";
+        if (state === "DORMANT") {
+          stateClass = "state-dormant";
+        } else if (state === "NOT_STATED") {
+          stateClass = "state-gap";
+        }
+
+        const card = document.createElement('div');
+        card.className = `mod-status-box ${stateClass}`;
+        card.innerHTML = `
+          <div>
+            <div class="mod-box-top">
+              <span class="mod-box-title">${mod.num}. ${mod.name}</span>
+            </div>
+            <div class="mod-box-tag">${mod.tag}</div>
+            <div class="mod-box-desc">${mod.shortDesc}</div>
+          </div>
+          <div class="mod-box-bottom">
+            <span style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">${mod.role}</span>
+            <button class="mod-btn-jump" data-mod-id="${mod.id}">
+              🔍 View Full Data Flow Dossier
+            </button>
+          </div>
+        `;
+
+        card.querySelector('.mod-btn-jump').addEventListener('click', () => {
+          jumpToModuleDossier(mod.id);
+        });
+
+        container.appendChild(card);
+      });
+
+      document.getElementById('modeActHeading').innerHTML = `<span>●</span> MODULE ARCHITECTURE IN MODE 0${modeNum}`;
+    }
+
+    /* Render Master Module Dossiers (Tab 05) */
+    function renderMasterDossiers(filterStatus = 'all', modePerspective = 'master') {
+      const container = document.getElementById('masterDossierContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      MODULE_DOSSIERS.forEach(mod => {
+        let currentStatus = "ACTIVE";
+        if (modePerspective !== 'master') {
+          currentStatus = mod.modes[parseInt(modePerspective)] || "ACTIVE";
+        }
+
+        // Apply Status Filter
+        if (filterStatus === 'working' && currentStatus !== 'ACTIVE') return;
+        if (filterStatus === 'dormant' && currentStatus !== 'DORMANT') return;
+        if (filterStatus === 'gap' && currentStatus !== 'NOT_STATED') return;
+
+        const card = document.createElement('div');
+        card.className = 'master-dossier-card tactical-frame';
+        card.id = `dossier-${mod.id}`;
+
+        card.innerHTML = `
+          <div class="dossier-card-header">
+            <div class="dossier-id-wrap">
+              <div class="dossier-num-badge">${mod.num}</div>
+              <div class="dossier-title-box">
+                <h3>${mod.name}</h3>
+                <p>${mod.role} · ${mod.tag}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4-Box Flow Layout (IN -> PROCESS -> OUT -> REF) -->
+          <div class="flow-quad-grid">
+            <div class="flow-quad-box box-in">
+              <div class="flow-quad-title">📥 IN (Data Ingress)</div>
+              <div class="flow-quad-body">${mod.in}</div>
+            </div>
+            <div class="flow-quad-box box-proc">
+              <div class="flow-quad-title">⚙ PROCESS (Execution Logic)</div>
+              <div class="flow-quad-body">${mod.process}</div>
+            </div>
+            <div class="flow-quad-box box-out">
+              <div class="flow-quad-title">📤 OUT (Data Egress)</div>
+              <div class="flow-quad-body">${mod.out}</div>
+            </div>
+            <div class="flow-quad-box box-ref">
+              <div class="flow-quad-title">📑 REF / SPEC &amp; GAPS</div>
+              <div class="flow-quad-body">
+                <b>Timing:</b> ${mod.ref}<br><br>
+                <b>Note / Gap:</b> ${mod.gap}
+              </div>
+            </div>
+          </div>
+
+          <button class="dossier-code-toggle" onclick="toggleDossierDrawer('drawer-${mod.id}')">
+            <span>▸ Click to view byte-level payload map &amp; C-struct definitions</span>
+          </button>
+
+          <div class="dossier-code-drawer" id="drawer-${mod.id}">
+            <pre>${mod.struct}</pre>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    window.toggleDossierDrawer = function(id) {
+      const drawer = document.getElementById(id);
+      if (drawer) {
+        const isShown = drawer.style.display === 'block';
+        drawer.style.display = isShown ? 'none' : 'block';
+        snd.beep(1000, 0.05);
+      }
+    };
+
+    function jumpToModuleDossier(modId) {
+      applyMode(5);
+      setTimeout(() => {
+        const target = document.getElementById(`dossier-${modId}`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.style.borderColor = '#4f46e5';
+          target.style.boxShadow = '0 0 0 3px rgba(79, 70, 229, 0.3)';
+          setTimeout(() => {
+            target.style.borderColor = '';
+            target.style.boxShadow = '';
+          }, 2000);
+        }
+      }, 100);
+    }
+
+    /* Mode Switching Logic */
+    const tabBtns = document.querySelectorAll('.nav-tab-btn');
+    let toastTimer = null;
+
+    function showModeToast(cfg) {
+      const toast = document.getElementById('modeSwitchToast');
+      if (!toast) return;
+      toast.style.borderColor = cfg.accent;
+      toast.innerHTML = `<span style="color:${cfg.accent}; font-size:15px;">●</span> <span>ACTIVE: ${cfg.title}</span>`;
+      toast.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2400);
+    }
+
+    function applyMode(m, userInitiated = false) {
+      snd.beep(m === 5 ? 1400 : 1000);
+      const cfg = MODE_CONFIG[m];
+
+      // Update Tab Styles
+      tabBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-mode') === String(m));
+      });
+
+      // Update Sticky Masthead Mode Pill (always visible when scrolled)
+      const pill = document.getElementById('mastheadModePill');
+      if (pill) {
+        pill.style.color = cfg.accent;
+        pill.style.background = cfg.light;
+        pill.style.borderColor = cfg.accent;
+        pill.innerHTML = `<span>●</span> <span>${cfg.title}</span>`;
+      }
+
+      // Update Body Alert Class
+      document.body.classList.toggle('mode-3-active', m === 3);
+
+      // Handle Tab 5 vs Modes 1-4 Visibility
+      const stdView = document.getElementById('modeStandardView');
+      const modView = document.getElementById('moduleFlowView');
+
+      if (m === 5) {
+        stdView.style.display = 'none';
+        modView.style.display = 'flex';
+        renderMasterDossiers('all', 'master');
+        if (userInitiated) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          showModeToast(cfg);
+        }
+        return;
+      } else {
+        stdView.style.display = 'flex';
+        modView.style.display = 'none';
+      }
+
+      // Update Summary Header
+      document.getElementById('modeSummaryTitle').innerHTML = `<span>●</span> ${cfg.title}`;
+      document.getElementById('modeSummaryDesc').textContent = cfg.desc;
+      const card = document.getElementById('modeSummaryCard');
+      card.style.borderLeftColor = cfg.accent;
+
+      // Render Working vs Not Working Module Activation Grid
+      renderModeModuleCards(m);
+
+      // Update 8-Step Algorithm Strip
+      stepNodes.forEach(node => {
+        const stepNum = parseInt(node.getAttribute('data-step'));
+        const isActive = cfg.activeSteps.includes(stepNum);
+        node.classList.toggle('active-step', isActive);
+        node.classList.toggle('dormant-step', !isActive);
+        if (isActive) {
+          node.style.setProperty('--m-accent', cfg.accent);
+          node.style.setProperty('--m-light', cfg.light);
+        }
+      });
+
+      document.getElementById('algoStripStatus').textContent = `ACTIVE IN THIS MODE: ${cfg.activeSteps.length} OF 8 STEPS · (N-1)th FRAME SEQUENTIAL CPU EXECUTION`;
+
+      // Update & Animate SVG Schematic Highlights
+      const topoIcon = document.getElementById('topoTitleIcon');
+      if (topoIcon) topoIcon.style.background = cfg.accent;
+
+      const arrowPath = document.querySelector('#arrowActive path');
+      if (arrowPath) arrowPath.setAttribute('fill', cfg.accent);
+
+      const isDsp = (m === 2 || m === 3);
+      const isAlgo = (m === 2 || m === 3);
+      const isCm = (m === 2 || m === 3 || m === 4);
+      const isGimbal = (m === 2 || m === 3 || m === 4);
+
+      const setNodeStroke = (id, active) => {
+        const el = document.getElementById(id);
+        if (el) el.querySelector('rect').setAttribute('stroke', active ? cfg.accent : '#cbd5e1');
+      };
+
+      const setPathAnim = (id, active) => {
+        const p = document.getElementById(id);
+        if (!p) return;
+        p.setAttribute('stroke', active ? cfg.accent : '#cbd5e1');
+        p.setAttribute('marker-end', active ? 'url(#arrowActive)' : 'url(#arrow)');
+        p.classList.toggle('flow-path-active', active);
+        p.classList.toggle('flow-path-dormant', !active);
+      };
+
+      setNodeStroke('nodeSel', true);
+      setNodeStroke('nodeDec', true);
+      setNodeStroke('nodeVwm', true);
+      setNodeStroke('nodeDsp', isDsp);
+      setNodeStroke('nodeAlgo', isAlgo);
+      setNodeStroke('nodeCm', isCm);
+
+      // Base video & ingress paths always active
+      setPathAnim('pathStn1', true);
+      setPathAnim('pathStn2', true);
+      setPathAnim('pathStn3', true);
+      setPathAnim('pathDemux', true);
+      setPathAnim('pathDec', true);
+      setPathAnim('pathVwm', true);
+      setPathAnim('pathWall', true);
+
+      // Mode-dependent track / algorithm / gimbal paths
+      setPathAnim('pathDsp', isDsp);
+      setPathAnim('pathAlgo', isAlgo);
+      setPathAnim('pathAlgoSym', isAlgo);
+      setPathAnim('pathAlgoCm', isAlgo);
+      setPathAnim('pathGimbal', isGimbal);
+
+      if (userInitiated) {
+        if (window.scrollY > 100) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        card.classList.remove('mode-flash');
+        void card.offsetWidth;
+        card.classList.add('mode-flash');
+        showModeToast(cfg);
+      }
+
+      if (m === 3) snd.beep(700, 0.25, 'sawtooth');
+      if (m === 2) snd.beep(1600, 0.15, 'triangle');
+    }
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        applyMode(parseInt(btn.getAttribute('data-mode')), true);
+      });
+    });
+
+    // Tab 5 Filtering Handlers
+    let currentTab5Filter = 'all';
+    let currentTab5Mode = 'master';
+
+    document.querySelectorAll('.filter-btn-pill[data-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        snd.beep(1100, 0.05);
+        document.querySelectorAll('.filter-btn-pill[data-filter]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTab5Filter = btn.getAttribute('data-filter');
+        renderMasterDossiers(currentTab5Filter, currentTab5Mode);
+      });
+    });
+
+    document.querySelectorAll('.filter-btn-pill[data-mode-view]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        snd.beep(1100, 0.05);
+        document.querySelectorAll('.filter-btn-pill[data-mode-view]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTab5Mode = btn.getAttribute('data-mode-view');
+        renderMasterDossiers(currentTab5Filter, currentTab5Mode);
+      });
+    });
+
+    // Initialize to Mode 1 and Step 1 Inspector
+    applyMode(1);
+    inspectStep(1);
+  </script>
+</body>
+</html>
